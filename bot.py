@@ -313,7 +313,6 @@ def add_file(update: Update, context: CallbackContext):
 
 
 def getfilename(update: Update, context: CallbackContext):
-    """Stores the selected gender and asks for a photo."""
     user = admins.get(update.message.from_user['username'])
     command = update.message.text[0:5]
 
@@ -409,7 +408,6 @@ def set_directory(update: Update):
 
 
 def message(update: Update, context: CallbackContext):
-    """Stores the selected gender and asks for a photo."""
     IsAdmin = is_admin(update)
     if not IsAdmin:
         return ConversationHandler.END
@@ -471,7 +469,7 @@ def is_admin(update: Update, have_message=True):
 
 
 def rename_dir_or_file(update: Update, context: CallbackContext):
-    """Rename specific directory in the current directory when the command /rename is issued"""
+    """Rename specific directory or file in the current directory when the command /rnd or /rnf is issued"""
     IsAdmin = is_admin(update)
     if not IsAdmin:
         return
@@ -521,7 +519,7 @@ def rename_dir_or_file(update: Update, context: CallbackContext):
 
 
 def get_files(update: Update, context: CallbackContext):
-    """Send specific file in the current directory when the command /get is issued"""
+    """Send specific file in the current directory when id is issued"""
     global CHANNEL_ID
     chat_id = update.message.chat_id
     message_text = str(update.message.text)
@@ -752,7 +750,7 @@ def send_naghd(update: Update, context: CallbackContext):
 def main():
     """Starts the bot"""
     # Create the Updater and pass it your bot's token.
-    updater = Updater("5222043208:AAER54ZwJlJFF3oCezDK4Gb1z0TRCk3gSK8")
+    updater = Updater("TOKEN")
 
     # Get the dispatcher to register handlers
     dispatcher = updater.dispatcher
