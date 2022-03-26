@@ -12,6 +12,9 @@ from telegram.ext import (Updater,
 import sqlite3
 import re
 
+from datetime import datetime, timedelta
+
+
 shanbe = 'شنبه'
 yekshanbe = 'یکشنبه'
 doshanbe = 'دوشنبه'
@@ -197,6 +200,9 @@ def courses_reply_markup(chat_id, show_courses=True):
 
 
 def courses_board(chat_id):
+    date = datetime.now() + timedelta(hours=4.5)
+    today = str((date.weekday()-5) % 7)
+
     sql = "SELECT courses FROM Users WHERE chat_id = ?"
     value = [chat_id]
     courses = do_sql_query2(sql, value, is_select_query=True)[
@@ -208,9 +214,10 @@ def courses_board(chat_id):
         course = do_sql_query2(sql, value, is_select_query=True)[0]
         my_courses.append(course)
 
-    courses = ""
+    courses = "کلاس های امروز:\n"
     for course in my_courses:
-        courses += course[1] + '\n'
+        if today in course[3].split(','):
+            courses += course[1] + '\n'
     return courses
 
 
@@ -293,7 +300,7 @@ def change(update: Update, context: CallbackContext):
     is_group = update.message.chat.type != "private"
 
     if is_group:
-        message = "مشاهده دروس شما در گروه ها امکان پذیر نمی باشد."
+        message = "تغییر نام کاربری و رمز عبور برای گروه تعریف نشده است!"
         update.message.reply_text(text=message)
         return ConversationHandler.END
 
