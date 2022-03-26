@@ -143,8 +143,11 @@ sql = "SELECT * FROM Users"
 Users = do_sql_query(sql, [], is_select_query=True)
 for User in Users:
     if User[0] and User[1] and User[2] and not User[3]:
-        start(User[0], User[1], User[2])
-        print(User[0])
+        try:
+            start(User[0], User[1], User[2])
+            print(User[0])
+        except:
+            pass
 
 
 # sql = "DELETE FROM ID WHERE id = ?"
