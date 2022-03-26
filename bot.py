@@ -12,6 +12,24 @@ from telegram.ext import (Updater,
 import sqlite3
 import re
 
+shanbe = 'شنبه'
+yekshanbe = 'یکشنبه'
+doshanbe = 'دوشنبه'
+seshanbe = 'سه شنبه'
+charshanbe = 'چهارشنبه'
+panjshanbe = 'پنجشنبه'
+jome = 'جمعه'
+
+days_dic = {
+    '0': shanbe,
+    '1': yekshanbe,
+    '2': doshanbe,
+    '3': seshanbe,
+    '4': charshanbe,
+    '5': panjshanbe,
+    '6': jome,
+}
+
 admins = {
     "MHHasani": ["ALL", ['root'], 'root', None, [0]],
     "Sohrab_sajedi": ["TLA", ['root/term4/TLA', 'root/term4/Labs'], 'root', None, [0]],
@@ -69,6 +87,7 @@ def get_inline_keyboard(current_dir=current_dir):
     keyboard = [
         [
             InlineKeyboardButton("🏠 Home", callback_data='home_button'),
+            InlineKeyboardButton("LMS", callback_data='LMS'),
             # InlineKeyboardButton("❌ close", callback_data='close'),
             InlineKeyboardButton("🔙 Back", callback_data='back_button'),
         ],
@@ -115,6 +134,195 @@ def do_sql_query(query, values, is_select_query=False, has_regex=False):
     finally:
         conn.commit()
         cursor.close()
+
+
+def do_sql_query2(query, values, is_select_query=False):
+    try:
+        conn = sqlite3.connect('Data_LMS.db')
+        cursor = conn.cursor()
+        cursor.execute(query, values)
+        if is_select_query:
+            rows = cursor.fetchall()
+            return rows
+    finally:
+        conn.commit()
+        cursor.close()
+
+
+def courses_reply_markup(chat_id, show_courses=True):
+    sql = "SELECT courses FROM Users WHERE chat_id = ?"
+    value = [chat_id]
+    courses = do_sql_query2(sql, value, is_select_query=True)[
+        0][0].split(',')
+    my_courses = []
+    for i in range(len(courses)-1):
+        sql = "SELECT * FROM Courses WHERE id = ?"
+        value = [courses[i]]
+        course = do_sql_query2(sql, value, is_select_query=True)[0]
+        my_courses.append(course)
+
+    keyboard = [
+        [
+            InlineKeyboardButton("🏠 Home", callback_data='home_button'),
+            InlineKeyboardButton("LMS", callback_data='LMS'),
+        ],
+    ]
+    if show_courses:
+        for course in my_courses:
+            keyboard.append([InlineKeyboardButton(
+                course[1], callback_data='course '+str(course[0]))])
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    return reply_markup
+
+
+def courses_board(chat_id):
+    sql = "SELECT courses FROM Users WHERE chat_id = ?"
+    value = [chat_id]
+    courses = do_sql_query2(sql, value, is_select_query=True)[
+        0][0].split(',')
+    my_courses = []
+    for i in range(len(courses)-1):
+        sql = "SELECT * FROM Courses WHERE id = ?"
+        value = [courses[i]]
+        course = do_sql_query2(sql, value, is_select_query=True)[0]
+        my_courses.append(course)
+
+    courses = ""
+    for course in my_courses:
+        courses += course[1] + '\n'
+    return courses
+
+
+def get_courses(query, context: CallbackContext):
+    sql_create_Courses_table = """ CREATE TABLE IF NOT EXISTS Courses (
+                                        id integer PRIMARY KEY,
+                                        name text NOT NULL,
+                                        clock text,
+                                        days text
+                                    ); """
+    sql_create_Users_table = """ CREATE TABLE IF NOT EXISTS Users (
+                                        chat_id text PRIMARY KEY,
+                                        username text,
+                                        password text,
+                                        id text,
+                                        name text ,
+                                        department text,
+                                        courses text
+                                    ); """
+    do_sql_query2(sql_create_Courses_table, values=[])
+    do_sql_query2(sql_create_Users_table, values=[])
+
+    chat_id = query.message.chat_id
+    message_id = query.message.message_id
+
+    sql = "SELECT chat_id, username, password, id FROM Users WHERE chat_id = ?"
+    value = [chat_id]
+    user = do_sql_query2(sql, value, is_select_query=True)
+
+    if not user:
+        query.message.reply_text(
+            text='اطلاعات شما در ربات ثبت نشده است.برای ثبت اطلاعات روی /lms کلیک کنید.')
+        return
+    elif not user[0][2]:
+        query.message.reply_text(
+            text='اطلاعات شما در ربات ثبت نشده است.برای ثبت اطلاعات روی /lms کلیک کنید.')
+        return
+    elif not user[0][3]:
+        query.message.reply_text(
+            text='فرایند بارگیری دیتا از lms مدتی طول می کشد.لطفا صبور باشید.')
+        return ConversationHandler.END
+    else:
+        reply_markup = courses_reply_markup(chat_id)
+        text = courses_board(chat_id)
+
+        query.message.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text,
+                                            parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+
+        # query.message.reply_text(
+        #     text=text, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+        return ConversationHandler.END
+
+
+def LMS(update: Update, context: CallbackContext):
+    global board_id
+    is_group = update.message.chat.type != "private"
+
+    if is_group:
+        message = "مشاهده دروس شما در گروه ها امکان پذیر نمی باشد."
+        update.message.reply_text(text=message)
+        return ConversationHandler.END
+
+    sql_create_Courses_table = """ CREATE TABLE IF NOT EXISTS Courses (
+                                        id integer PRIMARY KEY,
+                                        name text NOT NULL,
+                                        clock text,
+                                        days text
+                                    ); """
+    sql_create_Users_table = """ CREATE TABLE IF NOT EXISTS Users (
+                                        chat_id text PRIMARY KEY,
+                                        username text,
+                                        password text,
+                                        id text,
+                                        name text ,
+                                        department text,
+                                        courses text
+                                    ); """
+    do_sql_query2(sql_create_Courses_table, values=[])
+    do_sql_query2(sql_create_Users_table, values=[])
+
+    chat_id = update.message.chat_id
+    sql = "SELECT chat_id, username, password, id FROM Users WHERE chat_id = ?"
+    value = [chat_id]
+    user = do_sql_query2(sql, value, is_select_query=True)
+
+    if not user:
+        sql = "INSERT INTO Users (chat_id) VALUES (?)"
+        value = [chat_id]
+        user = do_sql_query2(sql, value)
+        update.message.reply_text(
+            text='لطفا نام کاربری خود در سامانه lms را وارد کنید:')
+        return 1
+    elif not user[0][2]:
+        update.message.reply_text(
+            text='لطفا نام کاربری خود در سامانه lms را وارد کنید:')
+        return 1
+    elif not user[0][3]:
+        update.message.reply_text(
+            text='فرایند بارگیری دیتا از lms مدتی طول می کشد.لطفا صبور باشید.')
+        return ConversationHandler.END
+    else:
+        reply_markup = courses_reply_markup(chat_id)
+        text = courses_board(chat_id)
+        board_id = update.message.reply_text(
+            text=text, parse_mode=ParseMode.HTML, reply_markup=reply_markup).message_id
+        return ConversationHandler.END
+
+
+def get_username(update: Update, context: CallbackContext):
+    chat_id = update.message.chat_id
+    text = update.message.text
+    sql = 'UPDATE Users SET username = ? WHERE chat_id = ?'
+    value = [text, chat_id]
+    user = do_sql_query2(sql, value)
+    update.message.reply_text(
+        text='لطفا رمز عبور خود در سامانه lms را وارد کنید:')
+    return 2
+
+
+def get_password(update: Update, context: CallbackContext):
+    user = update.message.from_user['username']
+    chat_id = update.message.chat_id
+
+    text = update.message.text
+    sql = 'UPDATE Users SET password = ? WHERE chat_id = ?'
+    value = [text, chat_id]
+    do_sql_query2(sql, value)
+    update.message.reply_text(
+        text='فرایند بارگیری دیتا از lms مدتی طول می کشد.لطفا صبور باشید.')
+    update.message.bot.send_message(
+        chat_id=CHANNEL_LOG, text=f'کاربر @{user} اطلاعات lms خود را ثبت کرد.')
+    return ConversationHandler.END
 
 
 def get_and_set_id(update=None, context=None):
@@ -719,6 +927,37 @@ def Inline_buttons(update: Update, context: CallbackContext):
                 pass
         query.answer(text="ددلاین ها")
 
+    elif query.data == 'LMS':
+        if is_group:
+            message = "مشاهده دروس شما در گروه ها امکان پذیر نمی باشد."
+            query.message.reply_text(text=message)
+        else:
+            try:
+                get_courses(query, context)
+            except:
+                pass
+        query.answer(text="LMS")
+
+    elif query.data.split()[0] == 'course':
+        sql = "SELECT * FROM Courses WHERE id = ?"
+        value = [query.data.split()[1]]
+        course = do_sql_query2(sql, value, is_select_query=True)[0]
+        text = ""
+        text += course[1] + '\n'
+        link = 'https://lms.iust.ac.ir/mod/adobeconnect/view.php?id=' + \
+            str(course[0])
+        text += link + '\n'
+        days = course[3].split(',')
+        for i in range(len(days)-2, -1, -1):
+            text += days_dic[days[i]]+' ها'+'\n'
+        text += 'ساعت ' + course[2] + '\n'
+        query.message.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text,
+                                            parse_mode=ParseMode.HTML, reply_markup=courses_reply_markup(chat_id, show_courses=False))
+        # query.message.bot.send_message(text=text, chat_id=chat_id)
+        query.message.bot.send_message(
+            chat_id=CHANNEL_LOG, text=f'@{user}({chat_id}) get {course[1]}')
+        query.answer(text=course[1])
+
     else:
         current_dir = query.data
         members[user] = current_dir
@@ -750,7 +989,7 @@ def send_naghd(update: Update, context: CallbackContext):
 def main():
     """Starts the bot"""
     # Create the Updater and pass it your bot's token.
-    updater = Updater("TOKEN")
+    updater = Updater("5222043208:AAER54ZwJlJFF3oCezDK4Gb1z0TRCk3gSK8")
 
     # Get the dispatcher to register handlers
     dispatcher = updater.dispatcher
@@ -807,6 +1046,17 @@ def main():
     )
 
     dispatcher.add_handler(send_file_handler)
+
+    LMS_handler = ConversationHandler(
+        entry_points=[CommandHandler("lms", LMS)],
+        states={
+            1: [MessageHandler(Filters.text & ~Filters.command, get_username)],
+            2: [MessageHandler(Filters.text & ~Filters.command, get_password)],
+        },
+        fallbacks=[CommandHandler('cancel', cancel)]
+    )
+
+    dispatcher.add_handler(LMS_handler)
 
     dispatcher.add_handler(MessageHandler(
         Filters.text & ~Filters.command, get_files))
