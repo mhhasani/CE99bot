@@ -62,6 +62,26 @@ CHANNEL_DEADLINE = "@deadline_ce99"
 CHANNEL_NAGHD = "@naghd_CE99_bot"
 
 
+def create_database():
+    sql_create_Courses_table = """ CREATE TABLE IF NOT EXISTS Courses (
+                                        id integer PRIMARY KEY,
+                                        name text NOT NULL,
+                                        clock text,
+                                        days text
+                                    ); """
+    sql_create_Users_table = """ CREATE TABLE IF NOT EXISTS Users (
+                                        chat_id text PRIMARY KEY,
+                                        username text,
+                                        password text,
+                                        id text,
+                                        name text ,
+                                        department text,
+                                        courses text
+                                    ); """
+    do_sql_query2(sql_create_Courses_table, values=[])
+    do_sql_query2(sql_create_Users_table, values=[])
+
+
 def create_board(current_dir=current_dir):
     """ Generate main page to display files and directories)"""
     sql = "SELECT name, type, id FROM info WHERE parent = ?"
@@ -195,23 +215,7 @@ def courses_board(chat_id):
 
 
 def get_courses(query, context: CallbackContext):
-    sql_create_Courses_table = """ CREATE TABLE IF NOT EXISTS Courses (
-                                        id integer PRIMARY KEY,
-                                        name text NOT NULL,
-                                        clock text,
-                                        days text
-                                    ); """
-    sql_create_Users_table = """ CREATE TABLE IF NOT EXISTS Users (
-                                        chat_id text PRIMARY KEY,
-                                        username text,
-                                        password text,
-                                        id text,
-                                        name text ,
-                                        department text,
-                                        courses text
-                                    ); """
-    do_sql_query2(sql_create_Courses_table, values=[])
-    do_sql_query2(sql_create_Users_table, values=[])
+    create_database()
 
     chat_id = query.message.chat_id
     message_id = query.message.message_id
@@ -253,23 +257,7 @@ def LMS(update: Update, context: CallbackContext):
         update.message.reply_text(text=message)
         return ConversationHandler.END
 
-    sql_create_Courses_table = """ CREATE TABLE IF NOT EXISTS Courses (
-                                        id integer PRIMARY KEY,
-                                        name text NOT NULL,
-                                        clock text,
-                                        days text
-                                    ); """
-    sql_create_Users_table = """ CREATE TABLE IF NOT EXISTS Users (
-                                        chat_id text PRIMARY KEY,
-                                        username text,
-                                        password text,
-                                        id text,
-                                        name text ,
-                                        department text,
-                                        courses text
-                                    ); """
-    do_sql_query2(sql_create_Courses_table, values=[])
-    do_sql_query2(sql_create_Users_table, values=[])
+    create_database()
 
     chat_id = update.message.chat_id
     sql = "SELECT chat_id, username, password, id FROM Users WHERE chat_id = ?"
@@ -281,11 +269,13 @@ def LMS(update: Update, context: CallbackContext):
         value = [chat_id]
         user = do_sql_query2(sql, value)
         update.message.reply_text(
-            text='لطفا نام کاربری خود در سامانه lms را وارد کنید:')
+            text='لطفا نام کاربری خود در سامانه lms را وارد کنید:' +
+            '\n در صورت انصراف روی /cancel کلیک کنید.')
         return 1
     elif not user[0][2]:
         update.message.reply_text(
-            text='لطفا نام کاربری خود در سامانه lms را وارد کنید:')
+            text='لطفا نام کاربری خود در سامانه lms را وارد کنید:' +
+            '\n در صورت انصراف روی /cancel کلیک کنید.')
         return 1
     elif not user[0][3]:
         update.message.reply_text(
@@ -299,6 +289,28 @@ def LMS(update: Update, context: CallbackContext):
         return ConversationHandler.END
 
 
+def change(update: Update, context: CallbackContext):
+    is_group = update.message.chat.type != "private"
+
+    if is_group:
+        message = "مشاهده دروس شما در گروه ها امکان پذیر نمی باشد."
+        update.message.reply_text(text=message)
+        return ConversationHandler.END
+
+    chat_id = update.message.chat_id
+    sql = "DELETE FROM Users WHERE chat_id = ?"
+    value = [chat_id]
+    do_sql_query2(sql, value, is_select_query=True)
+
+    sql = "INSERT INTO Users (chat_id) VALUES (?)"
+    value = [chat_id]
+    do_sql_query2(sql, value)
+    update.message.reply_text(
+        text='لطفا نام کاربری خود در سامانه lms را وارد کنید:' +
+        '\n در صورت انصراف روی /cancel کلیک کنید.')
+    return 1
+
+
 def get_username(update: Update, context: CallbackContext):
     chat_id = update.message.chat_id
     text = update.message.text
@@ -306,7 +318,8 @@ def get_username(update: Update, context: CallbackContext):
     value = [text, chat_id]
     user = do_sql_query2(sql, value)
     update.message.reply_text(
-        text='لطفا رمز عبور خود در سامانه lms را وارد کنید:')
+        text='لطفا رمز عبور خود در سامانه lms را وارد کنید:' +
+        '\n در صورت انصراف روی /cancel کلیک کنید.')
     return 2
 
 
@@ -1057,6 +1070,17 @@ def main():
     )
 
     dispatcher.add_handler(LMS_handler)
+
+    change_handler = ConversationHandler(
+        entry_points=[CommandHandler("change", change)],
+        states={
+            1: [MessageHandler(Filters.text & ~Filters.command, get_username)],
+            2: [MessageHandler(Filters.text & ~Filters.command, get_password)],
+        },
+        fallbacks=[CommandHandler('cancel', cancel)]
+    )
+
+    dispatcher.add_handler(change_handler)
 
     dispatcher.add_handler(MessageHandler(
         Filters.text & ~Filters.command, get_files))
