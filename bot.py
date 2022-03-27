@@ -187,13 +187,18 @@ def courses_reply_markup(chat_id, show_courses=True):
     keyboard = [
         [
             InlineKeyboardButton("🏠 Home", callback_data='home_button'),
-            InlineKeyboardButton("LMS", callback_data='LMS'),
+            InlineKeyboardButton("🏫کلاس های امروز🏫", callback_data='LMS'),
         ],
     ]
     if show_courses:
-        for course in my_courses:
-            keyboard.append([InlineKeyboardButton(
-                course[1], callback_data='course '+str(course[0]))])
+        for i in range(len(my_courses)):
+            if i % 2 == 0:
+                keyboard.append([InlineKeyboardButton(my_courses[i][1].split('گروه')[
+                                0], callback_data='course '+str(my_courses[i][0]))])
+            else:
+                c = len(keyboard) - 1
+                keyboard[c].append(InlineKeyboardButton(my_courses[i][1].split('گروه')[
+                    0], callback_data='course '+str(my_courses[i][0])))
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     return reply_markup
@@ -214,10 +219,18 @@ def courses_board(chat_id):
         course = do_sql_query2(sql, value, is_select_query=True)[0]
         my_courses.append(course)
 
-    courses = "کلاس های امروز:\n"
+    courses = "<b>🏫 کلاس های امروز🏫</b>\n\n"
+    c = 0
     for course in my_courses:
         if today in course[3].split(','):
-            courses += course[1] + '\n'
+            if c % 2:
+                courses += "🔸"
+            else:
+                courses += "🔹"
+            link = 'https://lms.iust.ac.ir/mod/adobeconnect/view.php?id=' + \
+                str(course[0])
+            courses += f"<a href='{link}'>{course[1].split('گروه')[0]}</a>\n\n"
+            c += 1
     return courses
 
 
@@ -970,16 +983,15 @@ def Inline_buttons(update: Update, context: CallbackContext):
         value = [query.data.split()[1]]
         course = do_sql_query2(sql, value, is_select_query=True)[0]
         text = ""
-        text += course[1] + '\n'
         link = 'https://lms.iust.ac.ir/mod/adobeconnect/view.php?id=' + \
             str(course[0])
-        text += link + '\n'
+        text += f"<a href='{link}'>{course[1]}</a>\n"
         days = course[3].split(',')
         for i in range(len(days)-2, -1, -1):
             text += days_dic[days[i]]+' ها'+'\n'
         text += 'ساعت ' + course[2] + '\n'
         query.message.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text,
-                                            parse_mode=ParseMode.HTML, reply_markup=courses_reply_markup(chat_id, show_courses=False))
+                                            parse_mode=ParseMode.HTML, reply_markup=courses_reply_markup(chat_id, show_courses=True))
         # query.message.bot.send_message(text=text, chat_id=chat_id)
         query.message.bot.send_message(
             chat_id=CHANNEL_LOG, text=f'@{user}({chat_id}) get {course[1]}')
