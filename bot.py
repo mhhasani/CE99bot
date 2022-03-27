@@ -239,6 +239,7 @@ def get_courses(query, context: CallbackContext):
 
     chat_id = query.message.chat_id
     message_id = query.message.message_id
+    username = query.message.chat.username
 
     sql = "SELECT chat_id, username, password, id FROM Users WHERE chat_id = ?"
     value = [chat_id]
@@ -255,6 +256,8 @@ def get_courses(query, context: CallbackContext):
     elif not user[0][3]:
         query.message.reply_text(
             text='فرایند بارگیری دیتا از lms مدتی طول می کشد.لطفا صبور باشید.')
+        query.message.bot.send_message(
+            chat_id=CHANNEL_LOG, text=f'کاربر @{username} منتظر دریافت اطلاعات دروس خود می باشد.')
         return ConversationHandler.END
     else:
         reply_markup = courses_reply_markup(chat_id)
@@ -262,7 +265,8 @@ def get_courses(query, context: CallbackContext):
 
         query.message.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text,
                                             parse_mode=ParseMode.HTML, reply_markup=reply_markup)
-
+        query.message.bot.send_message(
+            chat_id=CHANNEL_LOG, text=f'کاربر @{username} روی lms کلیک کرد.')
         # query.message.reply_text(
         #     text=text, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
         return ConversationHandler.END
@@ -972,8 +976,6 @@ def Inline_buttons(update: Update, context: CallbackContext):
         else:
             try:
                 get_courses(query, context)
-                query.message.bot.send_message(
-                    chat_id=CHANNEL_LOG, text=f'کاربر @{user} روی lms کلیک کرد.')
             except:
                 pass
         query.answer(text="LMS")
