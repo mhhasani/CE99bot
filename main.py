@@ -35,23 +35,24 @@ def do_sql_query(query, values, is_select_query=False):
         cursor.close()
 
 
-# sql_create_Courses_table = """ CREATE TABLE IF NOT EXISTS Courses (
-#                                     id integer PRIMARY KEY,
-#                                     name text NOT NULL,
-#                                     clock text,
-#                                     days text
-#                                 ); """
-# sql_create_Users_table = """ CREATE TABLE IF NOT EXISTS Users (
-#                                     chat_id text PRIMARY KEY,
-#                                     username text,
-#                                     password text,
-#                                     id text,
-#                                     name text ,
-#                                     department text,
-#                                     courses text
-#                                 ); """
-# do_sql_query(sql_create_Courses_table, values=[])
-# do_sql_query(sql_create_Users_table, values=[])
+sql_create_Courses_table = """ CREATE TABLE IF NOT EXISTS Courses (
+                                    id integer PRIMARY KEY,
+                                    name text NOT NULL,
+                                    clock text,
+                                    days text
+                                ); """
+sql_create_Users_table = """ CREATE TABLE IF NOT EXISTS Users (
+                                    chat_id text PRIMARY KEY,
+                                    username text,
+                                    password text,
+                                    id text,
+                                    name text ,
+                                    department text,
+                                    courses text,
+                                    status integer DEFAULT 0
+                                ); """
+do_sql_query(sql_create_Courses_table, values=[])
+do_sql_query(sql_create_Users_table, values=[])
 
 
 def start(chat_id, username, password):
@@ -132,9 +133,9 @@ def start(chat_id, username, password):
             except:
                 continue
 
-        sql = "UPDATE Users SET id = ?, name = ?, department = ?, courses = ? WHERE chat_id = ?"
+        sql = "UPDATE Users SET id = ?, name = ?, department = ?, courses = ? ,status = ? WHERE chat_id = ?"
         values = [user['id'], user['name'], user['department'],
-                  str_courses_id, user['chat_id']]
+                  str_courses_id, 3, user['chat_id']]
         do_sql_query(sql, values)
         return dic_course
 
@@ -147,8 +148,12 @@ for User in Users:
             start(User[0], User[1], User[2])
             print(User[0])
         except:
-            pass
-
+            sql = "DELETE FROM Users WHERE chat_id = ?"
+            value = [User[0]]
+            do_sql_query(sql, value)
+            sql = "INSERT INTO Users (chat_id,status) VALUES (?,?)"
+            value = [User[0], 2]
+            do_sql_query(sql, value)
 
 # sql = "DELETE FROM ID WHERE id = ?"
 # sql = "INSERT INTO ID (id) VALUES (?)"

@@ -33,6 +33,14 @@ days_dic = {
     '6': jome,
 }
 
+Status = {
+    0: 'null',
+    1: 'waiting',
+    2: 'wrong',
+    3: 'correct',
+    4: 'ended'
+}
+
 admins = {
     "MHHasani": ["ALL", ['root'], 'root', None, [0]],
     "Sohrab_sajedi": ["TLA", ['root/term4/TLA', 'root/term4/Labs'], 'root', None, [0]],
@@ -79,7 +87,8 @@ def create_database():
                                         id text,
                                         name text ,
                                         department text,
-                                        courses text
+                                        courses text,
+                                        status integer DEFAULT 0
                                     ); """
     do_sql_query2(sql_create_Courses_table, values=[])
     do_sql_query2(sql_create_Users_table, values=[])
@@ -187,8 +196,13 @@ def courses_reply_markup(chat_id, show_courses=True):
     keyboard = [
         [
             InlineKeyboardButton("🏠 Home", callback_data='home_button'),
-            InlineKeyboardButton("🏫کلاس های امروز🏫", callback_data='LMS'),
+            InlineKeyboardButton("today", callback_data='LMS'),
+            InlineKeyboardButton("🔙 Back", callback_data='back_lms'),
         ],
+        [InlineKeyboardButton("همه کلاس ها",
+                              callback_data='all_courses')],
+        [InlineKeyboardButton("⏱ ددلاین ها و کوییز ها ⏱",
+                              callback_data='deadline')],
     ]
     if show_courses:
         for i in range(len(my_courses)):
@@ -219,7 +233,7 @@ def courses_board(chat_id):
         course = do_sql_query2(sql, value, is_select_query=True)[0]
         my_courses.append(course)
 
-    courses = "<b>🏫 کلاس های امروز🏫</b>\n\n"
+    courses = "<b>🏫 کلاس های امروز 🏫</b>\n\n"
     c = 0
     for course in my_courses:
         if today in course[3].split(','):
@@ -229,12 +243,12 @@ def courses_board(chat_id):
                 courses += "🔹"
             link = 'https://lms.iust.ac.ir/mod/adobeconnect/view.php?id=' + \
                 str(course[0])
-            courses += f"<a href='{link}'>{course[1].split('گروه')[0]}</a>\n\n"
+            courses += f"<a href='{link}'>{course[1].split('گروه')[0]}</a>ساعت {course[2]}\n\n"
             c += 1
     return courses
 
 
-def get_courses(query, context: CallbackContext):
+def get_courses(query, context: CallbackContext, show_courses=False):
     create_database()
 
     chat_id = query.message.chat_id
@@ -255,21 +269,46 @@ def get_courses(query, context: CallbackContext):
         return
     elif not user[0][3]:
         query.message.reply_text(
-            text='فرایند بارگیری دیتا از lms مدتی طول می کشد.لطفا صبور باشید.')
+            text='فرایند بارگیری دیتا از lms مدتی طول می کشد.لطفا صبور باشید.\nبرای تغییر نام کاربری و رمز عبور روی /change کلیک کنید.')
         query.message.bot.send_message(
             chat_id=CHANNEL_LOG, text=f'کاربر @{username} منتظر دریافت اطلاعات دروس خود می باشد.')
         return ConversationHandler.END
     else:
-        reply_markup = courses_reply_markup(chat_id)
+        reply_markup = courses_reply_markup(chat_id, show_courses=show_courses)
         text = courses_board(chat_id)
 
         query.message.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text,
                                             parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+
         query.message.bot.send_message(
             chat_id=CHANNEL_LOG, text=f'کاربر @{username} روی lms کلیک کرد.')
         # query.message.reply_text(
         #     text=text, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
         return ConversationHandler.END
+
+
+def get_course(query, context: CallbackContext):
+    chat_id = query.message.chat_id
+    message_id = query.message.message_id
+    user = query.from_user['username']
+
+    sql = "SELECT * FROM Courses WHERE id = ?"
+    value = [query.data.split()[1]]
+    course = do_sql_query2(sql, value, is_select_query=True)[0]
+    text = ""
+    link = 'https://lms.iust.ac.ir/mod/adobeconnect/view.php?id=' + \
+        str(course[0])
+    text += f"<a href='{link}'>{course[1]}</a>\n"
+    days = course[3].split(',')
+    for i in range(len(days)-2, -1, -1):
+        text += days_dic[days[i]]+' ها'+'\n'
+    text += 'ساعت ' + course[2] + '\n'
+    query.message.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text,
+                                        parse_mode=ParseMode.HTML, reply_markup=courses_reply_markup(chat_id, show_courses=False))
+    # query.message.bot.send_message(text=text, chat_id=chat_id)
+    query.message.bot.send_message(
+        chat_id=CHANNEL_LOG, text=f'@{user}({chat_id}) get {course[1]}')
+    query.answer(text=course[1])
 
 
 def LMS(update: Update, context: CallbackContext):
@@ -304,12 +343,12 @@ def LMS(update: Update, context: CallbackContext):
         return 1
     elif not user[0][3]:
         update.message.reply_text(
-            text='فرایند بارگیری دیتا از lms مدتی طول می کشد.لطفا صبور باشید.')
+            text='فرایند بارگیری دیتا از lms مدتی طول می کشد.لطفا صبور باشید.\nبرای تغییر نام کاربری و رمز عبور روی /change کلیک کنید.')
         update.message.bot.send_message(
             chat_id=CHANNEL_LOG, text=f'کاربر @{username} منتظر دریافت اطلاعات دروس خود می باشد.')
         return ConversationHandler.END
     else:
-        reply_markup = courses_reply_markup(chat_id)
+        reply_markup = courses_reply_markup(chat_id, show_courses=False)
         text = courses_board(chat_id)
         board_id = update.message.reply_text(
             text=text, parse_mode=ParseMode.HTML, reply_markup=reply_markup).message_id
@@ -357,11 +396,11 @@ def get_password(update: Update, context: CallbackContext):
     chat_id = update.message.chat_id
 
     text = update.message.text
-    sql = 'UPDATE Users SET password = ? WHERE chat_id = ?'
-    value = [text, chat_id]
+    sql = 'UPDATE Users SET password = ? , status = ? WHERE chat_id = ?'
+    value = [text, 1, chat_id]
     do_sql_query2(sql, value)
     update.message.reply_text(
-        text='فرایند بارگیری دیتا از lms مدتی طول می کشد.لطفا صبور باشید.')
+        text='فرایند بارگیری دیتا از lms مدتی طول می کشد.لطفا صبور باشید.\nبرای تغییر نام کاربری و رمز عبور روی /change کلیک کنید.')
     update.message.bot.send_message(
         chat_id=CHANNEL_LOG, text=f'کاربر @{user} اطلاعات lms خود را ثبت کرد.')
     return ConversationHandler.END
@@ -369,6 +408,8 @@ def get_password(update: Update, context: CallbackContext):
 
 def get_and_set_id(update=None, context=None):
     global chat_ids
+    global board_id
+
     sql = "SELECT id FROM ID"
     rows = do_sql_query(sql, [], is_select_query=True)
     ids = [str(row[0]) for row in rows]
@@ -383,6 +424,39 @@ def get_and_set_id(update=None, context=None):
 
     if update != None:
         update.message.reply_text("database edited!")
+
+        sql = "SELECT chat_id, status FROM Users WHERE status = ? OR status = ?"
+        value = [2, 3]
+        users = do_sql_query2(sql, value, is_select_query=True)
+        if users:
+            for user in users:
+                chat_id = user[0]
+                status = user[1]
+                if Status[status] == 'wrong':
+                    sql = "DELETE FROM Users WHERE chat_id = ?"
+                    value = [chat_id]
+                    do_sql_query2(sql, value, is_select_query=True)
+                    text = "❌ نام کاربری یا رمز عبور شما اشتباه است!\nبرای اصلاح روی /lms کلیک کنید."
+                    update.message.bot.send_message(chat_id=chat_id, text=text)
+                elif Status[status] == 'correct':
+                    sql = 'UPDATE Users SET status = ? WHERE chat_id = ?'
+                    value = [4, chat_id]
+                    do_sql_query2(sql, value)
+                    text = "✅ اطلاعات کلاس های شما با موفقیت از سامانه LMS دریافت شد!\nبرای تغییر نام کاربری و رمز عبور خود در سامانه می توانید روی "
+                    text += f"<a href='https://its.iust.ac.ir/user/password'>لینک</a>"
+                    text += " کلیک کنید."
+                    update.message.bot.send_message(
+                        chat_id=chat_id, text=text, parse_mode=ParseMode.HTML)
+
+                    reply_markup = courses_reply_markup(
+                        chat_id, show_courses=False)
+
+                    text = courses_board(chat_id)
+                    board_id = update.message.bot.send_message(
+                        chat_id=chat_id, text=text, parse_mode=ParseMode.HTML, reply_markup=reply_markup).message_id
+            update.message.reply_text("lms database edited!")
+        else:
+            update.message.reply_text("lms database is already update!")
 
 
 def start(update: Update, context: CallbackContext):
@@ -802,12 +876,6 @@ def get_files(update: Update, context: CallbackContext):
         except:
             pass
 
-    # try:
-    #     update.message.bot.forward_message(
-    #         chat_id=CHANNEL_CHAT_LOG, from_chat_id=chat_id, message_id=message_id)
-    # except:
-    #     pass
-
 
 def clear_illegal_commands(update: Update, context: CallbackContext):
     """Clears illegal messages and commands in chat"""
@@ -831,8 +899,12 @@ def get_dead_line(dir):
 
 
 def dead_line(update: Update, context: CallbackContext):
-    IsAdmin = is_admin(update)
-    if not IsAdmin:
+    try:
+        IsAdmin = is_admin(update)
+        if not IsAdmin:
+            return
+    except:
+        update.message.reply_text(text='ابتدا ربات را استارت کنید.')
         return
 
     global CHANNEL_DEADLINE
@@ -915,6 +987,14 @@ def Inline_buttons(update: Update, context: CallbackContext):
             pass
         query.answer(text=current_dir)
 
+    elif query.data == 'back_lms':
+        try:
+            update.callback_query.edit_message_text(text=create_board(
+                current_dir), parse_mode=ParseMode.HTML, reply_markup=get_inline_keyboard(current_dir))
+        except:
+            pass
+        query.answer(text=current_dir)
+
     elif query.data == 'home_button':
         current_dir = MAIN_DIR_NAME
         members[user] = current_dir
@@ -975,29 +1055,24 @@ def Inline_buttons(update: Update, context: CallbackContext):
             query.message.reply_text(text=message)
         else:
             try:
-                get_courses(query, context)
+                get_courses(query, context, show_courses=False)
+            except:
+                pass
+        query.answer(text="LMS")
+
+    elif query.data == 'all_courses':
+        if is_group:
+            message = "مشاهده دروس شما در گروه ها امکان پذیر نمی باشد."
+            query.message.reply_text(text=message)
+        else:
+            try:
+                get_courses(query, context, show_courses=True)
             except:
                 pass
         query.answer(text="LMS")
 
     elif query.data.split()[0] == 'course':
-        sql = "SELECT * FROM Courses WHERE id = ?"
-        value = [query.data.split()[1]]
-        course = do_sql_query2(sql, value, is_select_query=True)[0]
-        text = ""
-        link = 'https://lms.iust.ac.ir/mod/adobeconnect/view.php?id=' + \
-            str(course[0])
-        text += f"<a href='{link}'>{course[1]}</a>\n"
-        days = course[3].split(',')
-        for i in range(len(days)-2, -1, -1):
-            text += days_dic[days[i]]+' ها'+'\n'
-        text += 'ساعت ' + course[2] + '\n'
-        query.message.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text,
-                                            parse_mode=ParseMode.HTML, reply_markup=courses_reply_markup(chat_id, show_courses=True))
-        # query.message.bot.send_message(text=text, chat_id=chat_id)
-        query.message.bot.send_message(
-            chat_id=CHANNEL_LOG, text=f'@{user}({chat_id}) get {course[1]}')
-        query.answer(text=course[1])
+        get_course(query, context)
 
     else:
         current_dir = query.data
@@ -1027,13 +1102,65 @@ def send_naghd(update: Update, context: CallbackContext):
     return ConversationHandler.END
 
 
+def is_online(clock, now):
+    clock = clock.split(':')
+    hour = clock[0]
+    minute = clock[1]
+    res1 = int(hour)*60 + int(minute)
+    clock = now.split(':')
+    hour = now[0]
+    minute = now[1]
+    res2 = int(hour)*60 + int(minute)
+    return res1-res2 <= 30
+
+
+def callback_minute(context: CallbackContext):
+    from datetime import datetime
+    now = datetime.now() + timedelta(hours=4.5)
+    today = str((now.weekday()-5) % 7)
+    now = now.strftime("%H:%M")
+
+    now_course = []
+
+    sql = "SELECT * FROM Courses"
+    courses = do_sql_query2(sql, [], is_select_query=True)
+
+    for course in courses:
+        if today in course[3].split(','):
+            if is_online(course[2], now):
+                now_course.append(str(course[0]))
+
+    sql = "SELECT chat_id, courses FROM Users WHERE status = ?"
+    value = [4]
+    users = do_sql_query2(sql, value, is_select_query=True)
+    for user in users:
+        for course in user[1].split(','):
+            if course in now_course:
+                sql = "SELECT name, clock FROM Courses WHERE id = ?"
+                value = [int(course)]
+                this_course = do_sql_query2(
+                    sql, value, is_select_query=True)[0]
+                name = this_course[0].split('گروه')[0]
+                clock = this_course[1]
+                text = '❌ کلاس "{}" ساعت {} برگزار خواهد شد.'.format(
+                    f'<b>{name}</b>', clock)
+                keyboard = [[InlineKeyboardButton(
+                    f'لینک کلاس {name}', callback_data='course '+str(course))]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                context.bot.send_message(
+                    chat_id=user[0], text=text, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+
+
 def main():
     """Starts the bot"""
     # Create the Updater and pass it your bot's token.
-    updater = Updater("5222043208:AAER54ZwJlJFF3oCezDK4Gb1z0TRCk3gSK8")
+    updater = Updater(
+        "5222043208:AAER54ZwJlJFF3oCezDK4Gb1z0TRCk3gSK8", use_context=True)
 
     # Get the dispatcher to register handlers
     dispatcher = updater.dispatcher
+    j = updater.job_queue
+    j.run_repeating(callback_minute, interval=600, first=1)
 
     # on different commands - answer in Telegram
     dispatcher.add_handler(CommandHandler("start", start))
@@ -1112,6 +1239,7 @@ def main():
 
     dispatcher.add_handler(MessageHandler(
         Filters.text & ~Filters.command, get_files))
+
     dispatcher.add_handler(CallbackQueryHandler(Inline_buttons))
 
     # Start the Bot
