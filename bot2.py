@@ -1,4 +1,3 @@
-from turtle import update
 from telegram import (Update,
                       ParseMode,
                       InlineKeyboardMarkup,
@@ -28,8 +27,6 @@ panjshanbe = 'پنجشنبه'
 jome = 'جمعه'
 
 jozve_member_id = {}
-board_member_id = {}
-file_member_id = {}
 
 days_dic = {
     '0': shanbe,
@@ -202,7 +199,7 @@ def do_sql_query3(query, values, is_select_query=False):
         cursor.close()
 
 
-def courses_reply_markup(chat_id, show_courses=True, jozve=None, user=None):
+def courses_reply_markup(chat_id, show_courses=True, jozve=None):
     sql = "SELECT courses FROM Users WHERE chat_id = ?"
     value = [chat_id]
     courses = do_sql_query2(sql, value, is_select_query=True)[
@@ -214,30 +211,18 @@ def courses_reply_markup(chat_id, show_courses=True, jozve=None, user=None):
         course = do_sql_query2(sql, value, is_select_query=True)[0]
         my_courses.append(course)
 
-    sql = "SELECT admin FROM Directories WHERE id = ?"
-    print(jozve)
-    try:
-        value = [int(jozve)]
-        admin = do_sql_query3(sql, value, is_select_query=True)[0][0]
-    except:
-        pass
-
     keyboard = [
         [
             InlineKeyboardButton("🏠 Home", callback_data='home_button'),
             InlineKeyboardButton("today", callback_data='LMS'),
         ],
 
-        [InlineKeyboardButton("⏱ ددلاین ها و کوییز ها ⏱",
-                              callback_data='get_deadlines')],
+        # [InlineKeyboardButton("⏱ ددلاین ها و کوییز ها ⏱",
+        #                       callback_data='deadline')],
     ]
     if jozve != None:
-        # keyboard[0].append(InlineKeyboardButton("جزوه ها",
-        #                                         callback_data='jozve ' + str(jozve)))
-
-        if user == admin:
-            keyboard.append([InlineKeyboardButton("تغییر ددلاین",
-                                                  callback_data='edit_deadline ' + str(jozve))],)
+        keyboard[0].append(InlineKeyboardButton("جزوه ها",
+                                                callback_data='jozve ' + str(jozve)))
 
     keyboard.append([InlineKeyboardButton("همه کلاس ها",
                                           callback_data='all_courses')],)
@@ -292,7 +277,6 @@ def get_courses(query, context: CallbackContext, show_courses=False):
     create_database()
 
     global board_id
-    global board_member_id
 
     chat_id = query.message.chat_id
     message_id = query.message.message_id
@@ -320,8 +304,8 @@ def get_courses(query, context: CallbackContext, show_courses=False):
         reply_markup = courses_reply_markup(chat_id, show_courses=show_courses)
         text = courses_board(chat_id)
 
-        board_member_id[chat_id] = query.message.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text,
-                                                                       parse_mode=ParseMode.HTML, reply_markup=reply_markup).message_id
+        board_id = query.message.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text,
+                                                       parse_mode=ParseMode.HTML, reply_markup=reply_markup).message_id
 
         query.message.bot.send_message(
             chat_id=CHANNEL_LOG, text=f'کاربر @{username} روی lms کلیک کرد.')
@@ -330,27 +314,14 @@ def get_courses(query, context: CallbackContext, show_courses=False):
         return ConversationHandler.END
 
 
-def get_course(query, context: CallbackContext, update=None):
-    global jozve_member_id
-    global board_member_id
-
-    if update != None:
-        chat_id = update.message.chat_id
-        message_id = update.message.message_id
-        user = update.message.from_user['username']
-    else:
-        chat_id = query.message.chat_id
-        message_id = query.message.message_id
-        user = query.from_user['username']
+def get_course(query, context: CallbackContext):
+    chat_id = query.message.chat_id
+    message_id = query.message.message_id
+    user = query.from_user['username']
 
     sql = "SELECT * FROM Courses WHERE id = ?"
-    if update != None:
-        value = [jozve_member_id[chat_id]]
-    else:
-        value = [query.data.split()[1]]
+    value = [query.data.split()[1]]
     course = do_sql_query2(sql, value, is_select_query=True)[0]
-    dead_line = get_deadline(course[0])
-
     text = ""
     link = 'https://lms.iust.ac.ir/mod/adobeconnect/view.php?id=' + \
         str(course[0])
@@ -358,25 +329,13 @@ def get_course(query, context: CallbackContext, update=None):
     days = course[3].split(',')
     for i in range(len(days)-2, -1, -1):
         text += days_dic[days[i]]+' ها'+'\n'
-    text += 'ساعت ' + course[2] + '\n\n'
-
-    if dead_line:
-        text += "ددلاین ها و کوییز ها:\n\n"
-        text += dead_line
-
-    if update != None:
-        update.message.bot.edit_message_text(chat_id=chat_id, message_id=board_member_id[chat_id], text=text,
-                                             parse_mode=ParseMode.HTML, reply_markup=courses_reply_markup(chat_id, show_courses=False, jozve=str(course[0]), user=user))
-        # query.message.bot.send_message(text=text, chat_id=chat_id)
-        update.message.reply_text(text='ددلاین با موفقیت ویرایش شد!')
-
-    else:
-        query.message.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text,
-                                            parse_mode=ParseMode.HTML, reply_markup=courses_reply_markup(chat_id, show_courses=False, jozve=str(course[0]), user=user))
-        # query.message.bot.send_message(text=text, chat_id=chat_id)
-        board_member_id[chat_id] = query.message.bot.send_message(
-            chat_id=CHANNEL_LOG, text=f'@{user}({chat_id}) get {course[1]}').message_id
-        query.answer(text=course[1])
+    text += 'ساعت ' + course[2] + '\n'
+    query.message.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text,
+                                        parse_mode=ParseMode.HTML, reply_markup=courses_reply_markup(chat_id, show_courses=False, jozve=str(course[0])))
+    # query.message.bot.send_message(text=text, chat_id=chat_id)
+    board_id = query.message.bot.send_message(
+        chat_id=CHANNEL_LOG, text=f'@{user}({chat_id}) get {course[1]}').message_id
+    query.answer(text=course[1])
 
 
 def jozve_board(id):
@@ -476,8 +435,6 @@ def get_inline_jozve(id):
 
 def LMS(update: Update, context: CallbackContext):
     global board_id
-    global board_member_id
-
     is_group = update.message.chat.type != "private"
     username = update.message.chat.username
 
@@ -515,7 +472,7 @@ def LMS(update: Update, context: CallbackContext):
     else:
         reply_markup = courses_reply_markup(chat_id, show_courses=False)
         text = courses_board(chat_id)
-        board_member_id[chat_id] = update.message.reply_text(
+        board_id = update.message.reply_text(
             text=text, parse_mode=ParseMode.HTML, reply_markup=reply_markup).message_id
         update.message.bot.send_message(
             chat_id=CHANNEL_LOG, text=f'کاربر @{username} روی /lms کلیک کرد.')
@@ -574,7 +531,6 @@ def get_password(update: Update, context: CallbackContext):
 def get_and_set_id(update=None, context=None):
     global chat_ids
     global board_id
-    global board_member_id
 
     sql = "SELECT id FROM ID"
     rows = do_sql_query(sql, [], is_select_query=True)
@@ -619,7 +575,7 @@ def get_and_set_id(update=None, context=None):
                         chat_id, show_courses=False)
 
                     text = courses_board(chat_id)
-                    board_member_id[chat_id] = update.message.bot.send_message(
+                    board_id = update.message.bot.send_message(
                         chat_id=chat_id, text=text, parse_mode=ParseMode.HTML, reply_markup=reply_markup).message_id
             update.message.reply_text("lms database edited!")
         else:
@@ -629,7 +585,6 @@ def get_and_set_id(update=None, context=None):
 def start(update: Update, context: CallbackContext):
 
     global board_id
-    global board_member_id
     global current_dir
     global chat_ids
 
@@ -642,7 +597,7 @@ def start(update: Update, context: CallbackContext):
     add_user_to_chat_ids(chat_id)
     set_directory(update)
 
-    board_member_id[chat_id] = update.message.reply_text(text=create_board(
+    board_id = update.message.reply_text(text=create_board(
         current_dir), parse_mode=ParseMode.HTML, reply_markup=get_inline_keyboard(current_dir)).message_id
 
     return ConversationHandler.END
@@ -651,7 +606,6 @@ def start(update: Update, context: CallbackContext):
 def remove_file(update: Update, context: CallbackContext):
     """Remove specific file in the current directory when the command /rm is issued"""
     global board_id
-    global board_member_id
     global current_dir
 
     chat_id = update.message.chat_id
@@ -682,7 +636,7 @@ def remove_file(update: Update, context: CallbackContext):
             values = [dir_names[i]]
             do_sql_query(sql, values)
 
-    update.message.bot.edit_message_text(chat_id=chat_id, message_id=board_member_id[chat_id], text=create_board(
+    update.message.bot.edit_message_text(chat_id=chat_id, message_id=board_id, text=create_board(
         current_dir), parse_mode=ParseMode.HTML, reply_markup=get_inline_keyboard(current_dir))
 
 
@@ -705,7 +659,6 @@ def remove_dir(update: Update, context: CallbackContext):
         return
 
     global board_id
-    global board_member_id
     global current_dir
 
     chat_id = update.message.chat_id
@@ -722,7 +675,7 @@ def remove_dir(update: Update, context: CallbackContext):
 
     do_sql_query(sql, values, has_regex=True)
 
-    update.message.bot.edit_message_text(chat_id=chat_id, message_id=board_member_id[chat_id], text=create_board(
+    update.message.bot.edit_message_text(chat_id=chat_id, message_id=board_id, text=create_board(
         current_dir), parse_mode=ParseMode.HTML, reply_markup=get_inline_keyboard(current_dir))
 
 
@@ -747,7 +700,6 @@ def create_directory(update: Update, context: CallbackContext):
 
     global current_dir
     global board_id
-    global board_member_id
 
     chat_id = update.message.chat_id
     new_dir_name = ' '.join(update.message.text.split(' ')[1:])
@@ -760,7 +712,7 @@ def create_directory(update: Update, context: CallbackContext):
         values = [current_dir, new_dir_name, "dir", "null"]
         do_sql_query(sql, values)
 
-        update.message.bot.edit_message_text(chat_id=chat_id, message_id=board_member_id[chat_id], text=create_board(
+        update.message.bot.edit_message_text(chat_id=chat_id, message_id=board_id, text=create_board(
             current_dir), parse_mode=ParseMode.HTML, reply_markup=get_inline_keyboard(current_dir))
 
         message = "succesfully created!"
@@ -777,7 +729,6 @@ def is_dir_exists(dir_name, parent):
 def add_dir(update: Update, context: CallbackContext):
     """Create a new directory in the current directory when the command /mkdir is issued"""
     global jozve_member_id
-    global board_member_id
 
     chat_id = update.message.chat_id
     new_dir_name = update.message.text
@@ -797,112 +748,11 @@ def add_dir(update: Update, context: CallbackContext):
         values = [id, parent, new_dir_name]
         do_sql_query3(sql, values)
 
-        update.message.bot.edit_message_text(chat_id=chat_id, message_id=board_member_id[chat_id], text=jozve_board(
+        update.message.bot.edit_message_text(chat_id=chat_id, message_id=board_id, text=jozve_board(
             parent), parse_mode=ParseMode.HTML, reply_markup=get_inline_jozve(parent))
 
         message = "succesfully created!"
         update.message.reply_text(text=message)
-    return ConversationHandler.END
-
-
-def addfile(update: Update, context: CallbackContext):
-    """Save the received file"""
-
-    global CHANNEL_ID
-    global file_member_id
-
-    chat_id = update.message.chat_id
-    message_id = update.message.message_id
-    file_name = get_file_name(update)
-
-    if file_name != -1:
-        file_id = update.message.bot.forward_message(
-            CHANNEL_ID, from_chat_id=chat_id, message_id=message_id).message_id
-        file_member_id[chat_id] = [update, file_id, file_name]
-        message_text = 'Please send file name or send /skip to set default or send /cancel.'
-        update.message.reply_text(text=message_text)
-        return 4
-    else:
-        return ConversationHandler.END
-
-
-def get_filename(update: Update, context: CallbackContext):
-    global board_member_id
-    global file_member_id
-    global jozve_member_id
-
-    chat_id = update.message.chat_id
-    parent = jozve_member_id[chat_id]
-    command = update.message.text
-    file_name = file_member_id[chat_id][2]
-    file_id = file_member_id[chat_id][1]
-
-    if command != "/skip":
-        file_name = update.message.text
-        file_member_id[chat_id][2] = file_name
-
-    message = ""
-    message += f"✅ یک فایل با آیدی {file_id} اضافه شد!\n"
-    message += "نام فایل: "
-    message += file_name + "\n"
-    message += "آدرس: "
-    message += parent
-
-    sql = "INSERT INTO Files (id, parent, name) VALUES (?,?,?)"
-    values = [file_id, parent, file_name]
-    do_sql_query3(sql, values)
-
-    if file_id != None:
-        data = f'get {file_id}'
-        keyboard = [[InlineKeyboardButton(
-            "دریافت", callback_data=str(data))]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-    update.message.reply_text(text=message, reply_markup=reply_markup)
-
-    try:
-        update.message.bot.edit_message_text(chat_id=chat_id, message_id=board_member_id[chat_id], text=jozve_board(
-            parent), parse_mode=ParseMode.HTML, reply_markup=get_inline_jozve(parent))
-    except:
-        pass
-
-    return ConversationHandler.END
-
-
-def addfilelog(update: Update, context: CallbackContext):
-    global board_member_id
-    global file_member_id
-    global jozve_member_id
-
-    current_dir = members.get(update.message.from_user['username'])
-    chat_id = update.message.chat_id
-    command = update.message.text
-    update = file_member_id[chat_id][0]
-    file_name = file_member_id[chat_id][2]
-    file_id = file_member_id[chat_id][1]
-
-    message = ""
-    message += f"✅ یک فایل با آیدی {file_id} اضافه شد!\n"
-    message += "نام فایل: "
-    message += file_name + "\n"
-    message += "آدرس: "
-    message += current_dir
-    if command == "/yes":
-        sql = "INSERT INTO info (parent, name, type, id) VALUES (?,?,?,?)"
-        values = [current_dir, file_name, "file", str(file_id)]
-        do_sql_query(sql, values)
-        send_to_all(update, message, file_id)
-
-    elif command == "/no":
-        sql = "INSERT INTO info (parent, name, type, id) VALUES (?,?,?,?)"
-        values = [current_dir, file_name, "file", str(file_id)]
-        do_sql_query(sql, values)
-        update.message.reply_text(text=message)
-    try:
-        update.message.bot.edit_message_text(chat_id=chat_id, message_id=board_member_id[chat_id], text=create_board(
-            current_dir), parse_mode=ParseMode.HTML, reply_markup=get_inline_keyboard(current_dir))
-    except:
-        pass
     return ConversationHandler.END
 
 
@@ -965,8 +815,6 @@ def getfilename(update: Update, context: CallbackContext):
 
 
 def add_file_log(update: Update, context: CallbackContext):
-    global board_member_id
-
     user = admins.get(update.message.from_user['username'])
     current_dir = members.get(update.message.from_user['username'])
     chat_id = update.message.chat_id
@@ -993,7 +841,7 @@ def add_file_log(update: Update, context: CallbackContext):
         do_sql_query(sql, values)
         update.message.reply_text(text=message)
     try:
-        update.message.bot.edit_message_text(chat_id=chat_id, message_id=board_member_id[chat_id], text=create_board(
+        update.message.bot.edit_message_text(chat_id=chat_id, message_id=board_id, text=create_board(
             current_dir), parse_mode=ParseMode.HTML, reply_markup=get_inline_keyboard(current_dir))
     except:
         pass
@@ -1112,7 +960,6 @@ def rename_dir_or_file(update: Update, context: CallbackContext):
 
     global current_dir
     global board_id
-    global board_member_id
 
     chat_id = update.message.chat_id
     command = update.message.text[1:4]
@@ -1149,7 +996,7 @@ def rename_dir_or_file(update: Update, context: CallbackContext):
             update.message.bot.send_message(chat_id=chat_id, text=message)
 
     try:
-        update.message.bot.edit_message_text(chat_id=chat_id, message_id=board_member_id[chat_id], text=create_board(
+        update.message.bot.edit_message_text(chat_id=chat_id, message_id=board_id, text=create_board(
             current_dir), parse_mode=ParseMode.HTML, reply_markup=get_inline_keyboard(current_dir))
     except:
         pass
@@ -1270,37 +1117,12 @@ def edit_dead_line(update: Update, context: CallbackContext):
         return ConversationHandler.END
 
 
-def get_deadline(course_id):
-    sql = "SELECT deadline FROM Courses WHERE id = ?"
-    values = [int(course_id)]
-    deadline = do_sql_query2(sql, values, is_select_query=True)
-    try:
-        return deadline[0][0]
-    except:
-        return None
-
-
-def set_deadline(update: Update, context: CallbackContext):
-    global jozve_member_id
-
-    chat_id = update.message.chat_id
-    course_id = jozve_member_id[chat_id]
-    text = update.message.text
-
-    sql = "UPDATE Courses SET deadline = ? WHERE id = ?"
-    values = [text, course_id]
-    deadline = do_sql_query2(sql, values, is_select_query=True)
-
-    get_course(update, context, update)
-    return ConversationHandler.END
-
-
 def Inline_buttons(update: Update, context: CallbackContext):
     """Responses to buttons clicked in the inline keyboard"""
     global current_dir
     global deadline_id
     global jozve_member_id
-    global board_member_id
+    global board_id
 
     query = update.callback_query
     chat_id = query.message.chat_id
@@ -1423,54 +1245,12 @@ def Inline_buttons(update: Update, context: CallbackContext):
 
         query.answer(text='جزوه ها')
 
-    elif query.data.split()[0] == 'edit_deadline':
-        global jozve_member_id
-        global board_member_id
-
-        board_member_id[chat_id] = message_id
-
-        course_id = int(query.data.split()[1])
-        jozve_member_id[chat_id] = course_id
-        dead_line = get_deadline(course_id)
-        try:
-            query.message.reply_text(text=dead_line)
-        except:
-            pass
-        query.message.reply_text(text='ددلاین ویرایش شده را ارسال کنید:')
-        query.answer(text='تغییر ددلاین')
-        return 11
-
     elif query.data.split()[0] == 'add_dir':
-        board_member_id[chat_id] = query.message.message_id
+        board_id = query.message.message_id
         jozve_member_id[chat_id] = query.data.split()[1]
         query.message.reply_text(text='نام پوشه را وارد کنید:')
-        query.answer(text='افزودن پوشه')
-        return 1
-
-    elif query.data.split()[0] == 'add_file':
-        board_member_id[chat_id] = query.message.message_id
-        jozve_member_id[chat_id] = query.data.split()[1]
-        query.message.reply_text(text='فایل خود را ارسال کنید:')
         query.answer(text='افزودن فایل')
-        return 3
-
-    elif query.data == "get_deadlines":
-        sql = "SELECT courses FROM Users WHERE chat_id = ?"
-        value = [chat_id]
-        courses = do_sql_query2(sql, value, is_select_query=True)[
-            0][0].split(',')
-        text = ""
-        for i in range(len(courses)-1):
-            sql = "SELECT * FROM Courses WHERE id = ?"
-            value = [courses[i]]
-            course = do_sql_query2(sql, value, is_select_query=True)[0]
-            if course[4]:
-                text += '▫️' + course[1].split('گروه')[0] + ':' + '\n'
-                text += course[4] + '\n\n'
-
-        query.message.reply_text(text=text)
-
-        query.answer(text='ددلاین ها')
+        return 1
 
     else:
         current_dir = query.data
@@ -1623,10 +1403,7 @@ def main():
         states={
             1: [MessageHandler(Filters.text & ~Filters.command, add_dir)],
             2: [CallbackQueryHandler(Inline_buttons)],
-            3: [MessageHandler(Filters.all & ~Filters.command & ~Filters.text, addfile)],
-            4: [MessageHandler(Filters.text & ~Filters.command, get_filename),
-                CommandHandler('skip', get_filename)],
-            11: [MessageHandler(Filters.text & ~Filters.command, set_deadline)],
+            # 3: [MessageHandler(Filters.all & ~Filters.command & ~Filters.text, add_file)],
             # 4: [MessageHandler(~Filters.command & Filters.text, rm_file)],
             # 11: [MessageHandler(~Filters.command & Filters.text, get_name)],
         },

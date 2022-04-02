@@ -35,6 +35,19 @@ def do_sql_query(query, values, is_select_query=False):
         cursor.close()
 
 
+def do_sql_query2(query, values, is_select_query=False):
+    try:
+        conn = sqlite3.connect('jozve.db')
+        cursor = conn.cursor()
+        cursor.execute(query, values)
+        if is_select_query:
+            rows = cursor.fetchall()
+            return rows
+    finally:
+        conn.commit()
+        cursor.close()
+
+
 sql_create_Courses_table = """ CREATE TABLE IF NOT EXISTS Courses (
                                     id integer PRIMARY KEY,
                                     name text NOT NULL,
@@ -53,6 +66,37 @@ sql_create_Users_table = """ CREATE TABLE IF NOT EXISTS Users (
                                 ); """
 do_sql_query(sql_create_Courses_table, values=[])
 do_sql_query(sql_create_Users_table, values=[])
+
+
+sql_create_Directories_table = """ CREATE TABLE IF NOT EXISTS Directories (
+                                    id integer PRIMARY KEY,
+                                    parent integer,
+                                    name text NOT NULL,
+                                    admin text DEFAULT MHHasani
+                                ); """
+
+sql_create_Subdirs_table = """ CREATE TABLE IF NOT EXISTS SubDirs (
+                                    id integer PRIMARY KEY,
+                                    parent integer NOT NULL,
+                                    name text NOT NULL
+                                ); """
+
+sql_create_files_table = """ CREATE TABLE IF NOT EXISTS Files (
+                                    id integer PRIMARY KEY,
+                                    parent integer,
+                                    name text NOT NULL
+                                ); """
+
+do_sql_query2(sql_create_Directories_table, [])
+do_sql_query2(sql_create_Subdirs_table, [])
+do_sql_query2(sql_create_files_table, [])
+
+try:
+    sql = """ALTER TABLE Courses
+                                ADD deadline text;"""
+    do_sql_query(sql, [])
+except:
+    pass
 
 
 def start(chat_id, username, password):
@@ -154,6 +198,18 @@ for User in Users:
             sql = "INSERT INTO Users (chat_id,status) VALUES (?,?)"
             value = [User[0], 2]
             do_sql_query(sql, value)
+
+sql = "SELECT * FROM Courses"
+courses = do_sql_query(sql, [], is_select_query=True)
+
+for course in courses:
+    id = course[0]
+    name = course[1]
+    sql = "INSERT INTO Directories (id,name) VALUES (?,?)"
+    try:
+        do_sql_query2(sql, [id, name])
+    except:
+        pass
 
 # sql = "DELETE FROM ID WHERE id = ?"
 # sql = "INSERT INTO ID (id) VALUES (?)"
