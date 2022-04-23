@@ -50,6 +50,10 @@ Status = {
 
 admins = {
     "MHHasani": ["ALL", ['root'], 'root', None, [0]],
+    "Sohrab_sajedi": ["TLA", ['root/term4/TLA', 'root/term4/Labs'], 'root', None, [0]],
+    "VahidM313":  ["ALL", ['root'], 'root', None, [0]],
+    "Zhra_Tabatabaee": ["etemadi", ['root/term4/algorithm/etemadi', 'root/term4/CA/hosseini'], 'root', None, [5, 7]],
+    "As_de_Corazones": ["Labs", ['root/term4/Labs', 'root/term4/CA/beit', 'root/term4/Signals'], 'root', None, [4, 9, 8]],
 }
 
 members = {}
@@ -70,7 +74,7 @@ MAIN_DIR_NAME = 'root'
 current_dir = MAIN_DIR_NAME
 
 board_id = -1  # Initialized By sending the /start command
-CHANNEL_ID = "@CE99IUSTBOT"
+CHANNEL_ID = "@comp_elmos"
 CHANNEL_LOG = "@log_ceiust99"
 CHANNEL_CHAT_LOG = "@chat_log_ce"
 CHANNEL_DEADLINE = "@deadline_ce99"
@@ -209,9 +213,8 @@ def courses_reply_markup(chat_id, show_courses=True, jozve=None, user=None, show
 
     keyboard = [
         [
-            InlineKeyboardButton("🏠 Home", callback_data='LMS'),
-            InlineKeyboardButton("همه کلاس ها",
-                                 callback_data='all_courses')
+            InlineKeyboardButton("🏠 Home", callback_data='home_button'),
+            InlineKeyboardButton("today", callback_data='LMS'),
         ],
 
         [InlineKeyboardButton("⏱ ددلاین ها و کوییز ها ⏱",
@@ -230,6 +233,8 @@ def courses_reply_markup(chat_id, show_courses=True, jozve=None, user=None, show
                  ]
             )
 
+    keyboard.append([InlineKeyboardButton("همه کلاس ها",
+                                          callback_data='all_courses')],)
     if show_all_courses:
         sql = "SELECT id,name FROM Courses"
         value = []
@@ -445,10 +450,15 @@ def get_inline_jozve(id, user):
 
     keyboard = [
         [
-            InlineKeyboardButton("🏠 Home", callback_data='LMS'),
-            InlineKeyboardButton("همه کلاس ها", callback_data='all_courses'),
+            InlineKeyboardButton("🏠 Home", callback_data='home_button'),
+            InlineKeyboardButton("today", callback_data='LMS'),
             InlineKeyboardButton(
                 "🔙 Back", callback_data='jozve ' + str(parent)),
+        ],
+        [
+            InlineKeyboardButton("همه کلاس ها", callback_data='all_courses'),
+            # InlineKeyboardButton(
+            #     "جزوه ها", callback_data='jozve ' + str(id)),
         ],
         # [InlineKeyboardButton("⏱ ددلاین ها و کوییز ها ⏱",
         #                       callback_data='deadline')],
@@ -496,17 +506,6 @@ def get_inline_jozve(id, user):
 def LMS(update: Update, context: CallbackContext):
     global board_id
     global board_member_id
-    global current_dir
-    global chat_ids
-
-    chat_id = update.message.chat_id
-    user = update.message.from_user['username']
-
-    update.message.bot.send_message(
-        chat_id=CHANNEL_LOG, text=f'@{user} started bot!')
-
-    add_user_to_chat_ids(chat_id)
-    set_directory(update)
 
     is_group = update.message.chat.type != "private"
     username = update.message.chat.username
@@ -523,16 +522,18 @@ def LMS(update: Update, context: CallbackContext):
     value = [chat_id]
     user = do_sql_query2(sql, value, is_select_query=True)
 
-    welcome_text = 'به ربات CE99 خوش آمدید!\nبرای استفاده از امکانات ربات باید دروس خود را ثبت کنید.\nلطفا نام کاربری خود در سامانه lms را وارد کنید:\nدر صورت انصراف روی /cancel کلیک کنید.'
-
     if not user:
         sql = "INSERT INTO Users (chat_id) VALUES (?)"
         value = [chat_id]
         user = do_sql_query2(sql, value)
-        update.message.reply_text(text=welcome_text)
+        update.message.reply_text(
+            text='لطفا نام کاربری خود در سامانه lms را وارد کنید:' +
+            '\n در صورت انصراف روی /cancel کلیک کنید.')
         return 1
     elif not user[0][2]:
-        update.message.reply_text(text=welcome_text)
+        update.message.reply_text(
+            text='لطفا نام کاربری خود در سامانه lms را وارد کنید:' +
+            '\n در صورت انصراف روی /cancel کلیک کنید.')
         return 1
     elif not user[0][3]:
         update.message.reply_text(
@@ -545,6 +546,8 @@ def LMS(update: Update, context: CallbackContext):
         text = courses_board(chat_id)
         board_member_id[chat_id] = update.message.reply_text(
             text=text, parse_mode=ParseMode.HTML, reply_markup=reply_markup).message_id
+        update.message.bot.send_message(
+            chat_id=CHANNEL_LOG, text=f'کاربر @{username} روی /lms کلیک کرد.')
         return ConversationHandler.END
 
 
@@ -686,6 +689,44 @@ def start(update: Update, context: CallbackContext):
     return ConversationHandler.END
 
 
+def remove_file(update: Update, context: CallbackContext):
+    """Remove specific file in the current directory when the command /rm is issued"""
+    global board_id
+    global board_member_id
+    global current_dir
+
+    chat_id = update.message.chat_id
+    message_text = update.message.text
+    dir_names = message_text.split(" ")
+    user = admins.get(update.message.from_user['username'])
+
+    if not user:
+        return
+
+    if len(dir_names) >= 2:
+        for i in range(1, len(dir_names)):
+
+            sql = "SELECT parent FROM info WHERE type = 'file' AND id = ?"
+            values = [dir_names[i]]
+            address = do_sql_query(
+                sql, values, is_select_query=True)[0][0]
+
+            user_admin = user[1]
+            for dir in user_admin:
+                if address.find(dir) == 0:
+                    current_dir = address
+                    break
+            else:
+                continue
+
+            sql = "DELETE FROM info WHERE type = 'file' AND id = ?"
+            values = [dir_names[i]]
+            do_sql_query(sql, values)
+
+    update.message.bot.edit_message_text(chat_id=chat_id, message_id=board_member_id[chat_id], text=create_board(
+        current_dir), parse_mode=ParseMode.HTML, reply_markup=get_inline_keyboard(current_dir))
+
+
 def regexp(regex, expression):
     """ Receives an expression and specifies if it matches the received regex or not
     Args:
@@ -696,6 +737,75 @@ def regexp(regex, expression):
         return True if re.match(regex, expression) else False
     except Exception as e:
         return False
+
+
+def remove_dir(update: Update, context: CallbackContext):
+    """Remove specific directory in the current directory when the command /rmdir is issued"""
+    IsAdmin = is_admin(update)
+    if not IsAdmin:
+        return
+
+    global board_id
+    global board_member_id
+    global current_dir
+
+    chat_id = update.message.chat_id
+    message_text = update.message.text
+    dir_name = message_text.split("-r")[1].strip() if len(message_text.split(
+        "-r")) >= 2 else ' '.join(message_text.split(" ")[1:]).strip()
+
+    if len(message_text.split("-r")) >= 2:
+        sql = "DELETE FROM info WHERE name REGEXP ? AND parent = ? AND type = 'dir'"
+        values = [dir_name, current_dir]
+    else:
+        sql = "DELETE FROM info WHERE name = ? AND parent = ? AND type = 'dir'"
+        values = [dir_name, current_dir]
+
+    do_sql_query(sql, values, has_regex=True)
+
+    update.message.bot.edit_message_text(chat_id=chat_id, message_id=board_member_id[chat_id], text=create_board(
+        current_dir), parse_mode=ParseMode.HTML, reply_markup=get_inline_keyboard(current_dir))
+
+
+def is_directory_exists(dir_name):
+    """ Determines if the directory name sent exists in the current directory
+    Args:
+        dir_name(str): directory name
+    """
+    global current_dir
+
+    sql = "SELECT COUNT(*) FROM info WHERE name = ? AND parent = ?"
+    values = [dir_name, current_dir]
+    count = do_sql_query(sql, values, is_select_query=True)[0]
+    return True if int(count[0]) > 0 else False
+
+
+def create_directory(update: Update, context: CallbackContext):
+    """Create a new directory in the current directory when the command /mkdir is issued"""
+    IsAdmin = is_admin(update)
+    if not IsAdmin:
+        return
+
+    global current_dir
+    global board_id
+    global board_member_id
+
+    chat_id = update.message.chat_id
+    new_dir_name = ' '.join(update.message.text.split(' ')[1:])
+
+    if is_directory_exists(new_dir_name):
+        message = "directory has exist!"
+        update.message.bot.send_message(chat_id=chat_id, text=message)
+    else:
+        sql = "INSERT INTO info (parent, name, type, id) VALUES (?,?,?,?)"
+        values = [current_dir, new_dir_name, "dir", "null"]
+        do_sql_query(sql, values)
+
+        update.message.bot.edit_message_text(chat_id=chat_id, message_id=board_member_id[chat_id], text=create_board(
+            current_dir), parse_mode=ParseMode.HTML, reply_markup=get_inline_keyboard(current_dir))
+
+        message = "succesfully created!"
+        update.message.bot.send_message(chat_id=chat_id, text=message)
 
 
 def is_dir_exists(dir_name, parent):
@@ -862,6 +972,43 @@ def ADD_File_Log(update: Update, context: CallbackContext):
     return ConversationHandler.END
 
 
+def addfilelog(update: Update, context: CallbackContext):
+    global board_member_id
+    global file_member_id
+    global jozve_member_id
+
+    current_dir = members.get(update.message.from_user['username'])
+    chat_id = update.message.chat_id
+    command = update.message.text
+    update = file_member_id[chat_id][0]
+    file_name = file_member_id[chat_id][2]
+    file_id = file_member_id[chat_id][1]
+
+    message = ""
+    message += f"✅ یک فایل با آیدی {file_id} اضافه شد!\n"
+    message += "نام فایل: "
+    message += file_name + "\n"
+    message += "آدرس: "
+    message += current_dir
+    if command == "/yes":
+        sql = "INSERT INTO info (parent, name, type, id) VALUES (?,?,?,?)"
+        values = [current_dir, file_name, "file", str(file_id)]
+        do_sql_query(sql, values)
+        send_to_all(update, message, file_id)
+
+    elif command == "/no":
+        sql = "INSERT INTO info (parent, name, type, id) VALUES (?,?,?,?)"
+        values = [current_dir, file_name, "file", str(file_id)]
+        do_sql_query(sql, values)
+        update.message.reply_text(text=message)
+    try:
+        update.message.bot.edit_message_text(chat_id=chat_id, message_id=board_member_id[chat_id], text=create_board(
+            current_dir), parse_mode=ParseMode.HTML, reply_markup=get_inline_keyboard(current_dir))
+    except:
+        pass
+    return ConversationHandler.END
+
+
 def get_file_name(update):
     if update.message.audio:
         return update.message.audio.file_name
@@ -876,6 +1023,84 @@ def get_file_name(update):
         return update.message.photo[len(update.message.photo)-1].file_unique_id
     else:
         return -1
+
+
+def add_file(update: Update, context: CallbackContext):
+    """Save the received file"""
+    IsAdmin = is_admin(update, False)
+    if not IsAdmin:
+        return ConversationHandler.END
+
+    global CHANNEL_ID
+
+    chat_id = update.message.chat_id
+    message_id = update.message.message_id
+    user = admins.get(update.message.from_user['username'])
+    file_name = get_file_name(update)
+
+    if file_name != -1:
+        file_id = update.message.bot.forward_message(
+            CHANNEL_ID, from_chat_id=chat_id, message_id=message_id).message_id
+        user[3] = [update, file_id, file_name]
+        message_text = 'Please send file name or send /skip to set default or send /cancel.'
+        update.message.reply_text(text=message_text)
+        return 1
+    else:
+        return ConversationHandler.END
+
+
+def getfilename(update: Update, context: CallbackContext):
+    user = admins.get(update.message.from_user['username'])
+    command = update.message.text[0:5]
+
+    if command == "/skip":
+        update = user[3][0]
+        file_name = user[3][2]
+    else:
+        file_name = update.message.text
+        user[3][2] = file_name
+        update = user[3][0]
+
+    message_text = 'برای ارسال اطلاعیه اضافه شدن فایل روی کامند /yes و در غیر این صورت روی کامند /no  و در صورت انصراف روی /cancel کلیک کنید.'
+    update.message.reply_text(text=message_text)
+
+    return 2
+
+
+def add_file_log(update: Update, context: CallbackContext):
+    global board_member_id
+
+    user = admins.get(update.message.from_user['username'])
+    current_dir = members.get(update.message.from_user['username'])
+    chat_id = update.message.chat_id
+    command = update.message.text
+    update = user[3][0]
+    file_name = user[3][2]
+    file_id = user[3][1]
+
+    message = ""
+    message += f"✅ یک فایل با آیدی {file_id} اضافه شد!\n"
+    message += "نام فایل: "
+    message += file_name + "\n"
+    message += "آدرس: "
+    message += current_dir
+    if command == "/yes":
+        sql = "INSERT INTO info (parent, name, type, id) VALUES (?,?,?,?)"
+        values = [current_dir, file_name, "file", str(file_id)]
+        do_sql_query(sql, values)
+        send_to_all(update, message, file_id)
+
+    elif command == "/no":
+        sql = "INSERT INTO info (parent, name, type, id) VALUES (?,?,?,?)"
+        values = [current_dir, file_name, "file", str(file_id)]
+        do_sql_query(sql, values)
+        update.message.reply_text(text=message)
+    try:
+        update.message.bot.edit_message_text(chat_id=chat_id, message_id=board_member_id[chat_id], text=create_board(
+            current_dir), parse_mode=ParseMode.HTML, reply_markup=get_inline_keyboard(current_dir))
+    except:
+        pass
+    return ConversationHandler.END
 
 
 def change_dead_line_log(update: Update, dltext):
@@ -929,6 +1154,16 @@ def set_directory(update: Update):
     members[user] = MAIN_DIR_NAME
 
 
+def message(update: Update, context: CallbackContext):
+    IsAdmin = is_admin(update)
+    if not IsAdmin:
+        return ConversationHandler.END
+
+    message_text = 'Please send me your message or send /cancel .'
+    update.message.reply_text(text=message_text)
+    return 1
+
+
 def cancel(update: Update, context: CallbackContext):
     """Cancels and ends the conversation."""
     update.message.reply_text(text='ended!')
@@ -968,6 +1203,14 @@ def is_admin(update: Update, have_message=True):
         if have_message:
             message = "you are not admin!"
             update.message.bot.send_message(chat_id=chat_id, text=message)
+        return False
+
+    for user_base_dir in user_base_dirs:
+        if current_dir.find(user_base_dir) == 0:
+            break
+    else:
+        message = "you are not admin's of this section!"
+        update.message.reply_text(text=message)
         return False
     return True
 
@@ -1069,6 +1312,73 @@ def add_user_to_chat_ids(chat_id):
     global chat_ids
     if str(chat_id) not in chat_ids:
         chat_ids.append(str(chat_id))
+
+
+def get_dead_line(dir):
+    global deadline_id
+    for address, id in deadline_id.items():
+        if dir.find(address) == 0:
+            return id
+    return -1
+
+
+def dead_line(update: Update, context: CallbackContext):
+    try:
+        IsAdmin = is_admin(update)
+        if not IsAdmin:
+            return
+    except:
+        update.message.reply_text(text='ابتدا ربات را استارت کنید.')
+        return
+
+    global CHANNEL_DEADLINE
+
+    chat_id = update.message.chat_id
+    username = update.message.from_user['username']
+    current_dir = members.get(username)
+
+    dead_id = get_dead_line(current_dir)
+
+    if dead_id != -1:
+        update.message.bot.copy_message(
+            chat_id=chat_id, from_chat_id=CHANNEL_DEADLINE, message_id=str(dead_id))
+        message_text = 'Please send me new deadline or send /cancel.'
+        update.message.reply_text(text=message_text)
+        return 1
+    else:
+        message_text = 'this directory doesn\'t have deadline!'
+        update.message.reply_text(text=message_text)
+        return ConversationHandler.END
+
+
+def edit_dead_line(update: Update, context: CallbackContext):
+    IsAdmin = is_admin(update)
+    if not IsAdmin:
+        return ConversationHandler.END
+
+    global CHANNEL_DEADLINE
+
+    text = update.message.text
+    username = update.message.from_user['username']
+    current_dir = members.get(username)
+
+    dead_id = get_dead_line(current_dir)
+
+    if dead_id != -1:
+        try:
+            update.message.bot.edit_message_text(
+                chat_id=CHANNEL_DEADLINE, message_id=str(dead_id), text=text)
+            message_text = 'succesfully edited!'
+            update.message.reply_text(text=message_text)
+            change_dead_line_log(update, text)
+        except:
+            message_text = 'succesfully saved with no change!'
+            update.message.reply_text(text=message_text)
+        return ConversationHandler.END
+    else:
+        message_text = 'this directory doesn\'t have deadline!'
+        update.message.reply_text(text=message_text)
+        return ConversationHandler.END
 
 
 def get_deadline(course_id):
@@ -1561,21 +1871,11 @@ def callback_minute(context: CallbackContext):
         chat_id=CHANNEL_LOG, text=f'تعداد {counter} اطلاعیه ارسال شد.', parse_mode=ParseMode.HTML)
 
 
-def message(update: Update, context: CallbackContext):
-    IsAdmin = is_admin(update)
-    if not IsAdmin:
-        return ConversationHandler.END
-
-    message_text = 'Please send me your message or send /cancel .'
-    update.message.reply_text(text=message_text)
-    return 1
-
-
 def main():
     """Starts the bot"""
     # Create the Updater and pass it your bot's token.
     updater = Updater(
-        "5222043208:AAER54ZwJlJFF3oCezDK4Gb1z0TRCk3gSK8", use_context=True)
+        "5028311484:AAEsNgqzdIXS6tcb00znT2i5BCnXO7umbBc", use_context=True)
 
     # Get the dispatcher to register handlers
     dispatcher = updater.dispatcher
@@ -1583,21 +1883,24 @@ def main():
     j.run_repeating(callback_minute, interval=1800, first=1380)
 
     # on different commands - answer in Telegram
-    LMS_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", LMS)],
-        states={
-            1: [MessageHandler(Filters.text & ~Filters.command, get_username)],
-            2: [MessageHandler(Filters.text & ~Filters.command, get_password)],
-        },
-        fallbacks=[CommandHandler('cancel', cancel)]
-    )
-
-    dispatcher.add_handler(LMS_handler)
-
+    dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(CommandHandler("mkdir", create_directory))
+    dispatcher.add_handler(CommandHandler("rm", remove_file))
+    dispatcher.add_handler(CommandHandler("rmdir", remove_dir))
     dispatcher.add_handler(CommandHandler("rnf", rename_dir_or_file))
     dispatcher.add_handler(CommandHandler("rnd", rename_dir_or_file))
     dispatcher.add_handler(CommandHandler("update", get_and_set_id))
     dispatcher.add_handler(CommandHandler("all_courses", all_courses))
+
+    dead_line_handler = ConversationHandler(
+        entry_points=[CommandHandler("deadline", dead_line)],
+        states={
+            1: [MessageHandler(Filters.text & ~Filters.command, edit_dead_line)],
+        },
+        fallbacks=[CommandHandler('cancel', cancel)]
+    )
+
+    dispatcher.add_handler(dead_line_handler)
 
     send_handler = ConversationHandler(
         entry_points=[CommandHandler('send', message)],
@@ -1639,6 +1942,31 @@ def main():
         fallbacks=[CommandHandler('cancel', cancel)]
     )
     dispatcher.add_handler(add_remove_handler)
+
+    send_file_handler = ConversationHandler(
+        entry_points=[MessageHandler(
+            Filters.all & ~Filters.command & ~Filters.text, add_file)],
+        states={
+            1: [MessageHandler(Filters.text & ~Filters.command, getfilename),
+                CommandHandler('skip', getfilename)],
+            2: [CommandHandler('yes', add_file_log),
+                CommandHandler('no', add_file_log)],
+        },
+        fallbacks=[CommandHandler('cancel', cancel)]
+    )
+
+    dispatcher.add_handler(send_file_handler)
+
+    LMS_handler = ConversationHandler(
+        entry_points=[CommandHandler("lms", LMS)],
+        states={
+            1: [MessageHandler(Filters.text & ~Filters.command, get_username)],
+            2: [MessageHandler(Filters.text & ~Filters.command, get_password)],
+        },
+        fallbacks=[CommandHandler('cancel', cancel)]
+    )
+
+    dispatcher.add_handler(LMS_handler)
 
     change_handler = ConversationHandler(
         entry_points=[CommandHandler("change", change)],

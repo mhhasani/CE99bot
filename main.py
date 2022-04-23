@@ -2,7 +2,6 @@ import sqlite3
 import requests
 from bs4 import BeautifulSoup
 
-
 shanbe = 'شنبه'
 yekshanbe = 'یکشنبه'
 doshanbe = 'دوشنبه'
@@ -68,35 +67,44 @@ do_sql_query(sql_create_Courses_table, values=[])
 do_sql_query(sql_create_Users_table, values=[])
 
 
-sql_create_Directories_table = """ CREATE TABLE IF NOT EXISTS Directories (
-                                    id integer PRIMARY KEY,
-                                    parent integer,
-                                    name text NOT NULL,
-                                    admin text DEFAULT MHHasani
-                                ); """
-
 sql_create_Subdirs_table = """ CREATE TABLE IF NOT EXISTS SubDirs (
                                     id integer PRIMARY KEY,
                                     parent integer NOT NULL,
-                                    name text NOT NULL
+                                    name text NOT NULL,
+                                    FOREIGN KEY (parent) REFERENCES SubDirs(id) ON DELETE CASCADE
                                 ); """
 
 sql_create_files_table = """ CREATE TABLE IF NOT EXISTS Files (
                                     id integer PRIMARY KEY,
-                                    parent integer,
-                                    name text NOT NULL
+                                    parent integer NOT NULL,
+                                    name text NOT NULL,
+                                    FOREIGN KEY (parent) REFERENCES SubDirs(id) ON DELETE CASCADE
                                 ); """
 
-do_sql_query2(sql_create_Directories_table, [])
-do_sql_query2(sql_create_Subdirs_table, [])
-do_sql_query2(sql_create_files_table, [])
+# do_sql_query2(sql_create_Directories_table, [])
+do_sql_query(sql_create_Subdirs_table, [])
+do_sql_query(sql_create_files_table, [])
 
-try:
-    sql = """ALTER TABLE Courses
-                                ADD deadline text;"""
-    do_sql_query(sql, [])
-except:
-    pass
+# try:
+#     sql = """ALTER TABLE Courses
+#                                 ADD deadline text;"""
+#     do_sql_query(sql, [])
+# except:
+#     pass
+
+# try:
+#     sql = """DROP TABLE Directories;"""
+#     do_sql_query2(sql, [])
+# except:
+#     pass
+
+
+# try:
+#     sql = """ALTER TABLE Courses
+#                                 ADD admin text DEFAULT MHHasani;"""
+#     do_sql_query(sql, [])
+# except:
+#     pass
 
 
 def start(chat_id, username, password):
@@ -202,14 +210,6 @@ for User in Users:
 sql = "SELECT * FROM Courses"
 courses = do_sql_query(sql, [], is_select_query=True)
 
-for course in courses:
-    id = course[0]
-    name = course[1]
-    sql = "INSERT INTO Directories (id,name) VALUES (?,?)"
-    try:
-        do_sql_query2(sql, [id, name])
-    except:
-        pass
 
 # sql = "DELETE FROM ID WHERE id = ?"
 # sql = "INSERT INTO ID (id) VALUES (?)"
