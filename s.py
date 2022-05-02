@@ -43,3 +43,8 @@ for id in ids:
         do_sql_query(sql, values)
     except:
         pass
+
+
+sql = "UPDATE Users SET tel_username = ? WHERE chat_id = ?"
+values = ["Zhra_Tabatabaee", str(541638082)]
+do_sql_query(sql, values, is_select_query=True)

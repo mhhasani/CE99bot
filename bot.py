@@ -52,9 +52,6 @@ admins = {
     "MHHasani": ["ALL", ['root'], 'root', None, [0]],
 }
 
-members = {}
-chat_ids = []
-
 
 # Initialize root directory
 MAIN_DIR_NAME = 'root'
@@ -785,12 +782,16 @@ def cancel(update: Update, context: CallbackContext):
 def send_to_all_user(update: Update, context: CallbackContext):
     chat_id = update.message.chat_id
     message_id = update.message.message_id
+
+    sql = "SELECT chat_id FROM Users"
+    chat_ids = do_sql_query2(sql, [], True)
+
     for id in chat_ids:
         try:
             update.message.bot.copy_message(
-                chat_id=id, from_chat_id=chat_id, message_id=message_id)
+                chat_id=id[0], from_chat_id=chat_id, message_id=message_id)
         except:
-            print(id)
+            print(id[0])
     return cancel(update, context)
 
 
@@ -953,9 +954,11 @@ def set_admin(update: Update, context: CallbackContext):
     chat_id = update.message.chat_id
     new_admin = update.message.text.split('@')[-1]
 
-    sql = "SELECT admin FROM Courses WHERE id = ?"
+    sql = "SELECT admin,name FROM Courses WHERE id = ?"
     value = [jozve_member_id[chat_id]]
-    admins = do_sql_query2(sql, value, is_select_query=True)[0][0]
+    course = do_sql_query2(sql, value, is_select_query=True)
+    admins = course[0][0]
+    name = course[0][1]
 
     if new_admin in admins.split(','):
         update.message.reply_text(text=f"@{new_admin} is already admin!")
@@ -964,6 +967,15 @@ def set_admin(update: Update, context: CallbackContext):
         value = [admins + ',' + new_admin, int(jozve_member_id[chat_id])]
         do_sql_query2(sql, value)
         update.message.reply_text(text=f"@{new_admin} is admin from now!")
+        sql = "SELECT chat_id FROM Users WHERE tel_username = ?"
+        values = [new_admin]
+        chat_id = do_sql_query2(sql, values, True)
+        try:
+            text = f"شما از اکنون ادمین درس {name} می باشید."
+            update.message.bot.send_message(chat_id=chat_id[0][0], text=text)
+        except:
+            pass
+
     return ConversationHandler.END
 
 
@@ -1036,7 +1048,6 @@ def get_deadlines(update: Update, context: CallbackContext, query=None):
 
 def Inline_buttons(update: Update, context: CallbackContext):
     """Responses to buttons clicked in the inline keyboard"""
-    global current_dir
     global jozve_member_id
     global board_member_id
 
@@ -1045,12 +1056,6 @@ def Inline_buttons(update: Update, context: CallbackContext):
     message_id = query.message.message_id
     user = update.callback_query.from_user['username']
     is_group = query.message.chat.type != "private"
-
-    try:
-        current_dir = members[user]
-    except:
-        members[user] = MAIN_DIR_NAME
-        current_dir = members[user]
 
     if query.data.split()[0] == 'get':
         id = query.data.split()[1]
