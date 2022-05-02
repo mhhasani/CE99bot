@@ -1,3 +1,4 @@
+from calendar import c
 from telegram import (Update,
                       ParseMode,
                       InlineKeyboardMarkup,
@@ -64,6 +65,8 @@ board_id = -1  # Initialized By sending the /start command
 CHANNEL_ID = "@CE99IUSTBOT"
 CHANNEL_LOG = "@log_ceiust99"
 CHANNEL_CHAT_LOG = "@chat_log_ce"
+CHANNEL_DEADLINE = "@deadline_ce99"
+CHANNEL_NAGHD = "@naghd_CE99_bot"
 
 
 def create_database():
@@ -85,6 +88,80 @@ def create_database():
                                     ); """
     do_sql_query2(sql_create_Courses_table, values=[])
     do_sql_query2(sql_create_Users_table, values=[])
+
+
+def create_board(current_dir=current_dir):
+    """ Generate main page to display files and directories)"""
+    sql = "SELECT name, type, id FROM info WHERE parent = ?"
+    rows = do_sql_query(sql, [current_dir], is_select_query=True)
+    borad_text = "💠 {0} \n".format(current_dir)
+    borad_text += "برای دریافت فایل ها آیدی فایل را تایپ کنید\n\n"
+    num_files = 0
+    num_dirs = 0
+    for row in rows:
+        if row[1] == 'dir':
+            borad_text += "📂 {0} \n\n".format(row[0])
+            num_dirs += 1
+    for row in rows:
+        if row[1] == 'file':
+            borad_text += "🗄 {0}-{1}\n\n".format(row[2], row[0])
+            num_files += 1
+
+    return borad_text+"💢 {0} Files , {1} Dirs".format(num_files, num_dirs)
+
+
+def get_inline_keyboard(current_dir=current_dir):
+    """Return Inline Keyboard"""
+    keyboard = [
+        [
+            InlineKeyboardButton("🏠 Home", callback_data='home_button'),
+            InlineKeyboardButton("LMS", callback_data='LMS'),
+            # InlineKeyboardButton("❌ close", callback_data='close'),
+            InlineKeyboardButton("🔙 Back", callback_data='back_button'),
+        ],
+        [InlineKeyboardButton("⏱ ددلاین ها و کوییز ها ⏱",
+                              callback_data='get_deadlines')],
+        # [InlineKeyboardButton("👎 انتقادات و پیشنهادات 👍",
+        #                       callback_data='naghd')]
+    ]
+
+    sql = "SELECT name, type, id FROM info WHERE parent = ?"
+    rows = do_sql_query(sql, [current_dir], is_select_query=True)
+
+    for i in range(len(rows)):
+        if rows[i][1] == 'dir':
+            if i % 2 == 0:
+                keyboard.append([InlineKeyboardButton(
+                    "📂 {0}".format(rows[i][0]), callback_data=current_dir+f"/{rows[i][0]}")])
+            else:
+                c = len(keyboard) - 1
+                keyboard[c].append(InlineKeyboardButton(
+                    "📂 {0}".format(rows[i][0]), callback_data=current_dir+f"/{rows[i][0]}"))
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    return reply_markup
+
+
+def do_sql_query(query, values, is_select_query=False, has_regex=False):
+    """ Connects to the database, executes the query, and returns results, if any.s
+    Args:
+        query(str): query to execute
+        values(list): a list of parameters in the query
+        is_select_query(boolean): Indicates whether the sent query is 'select query' or not
+        has_regex(boolean): Indicates whether the sent query contains regex or not
+    """
+    try:
+        conn = sqlite3.connect('Data.db')
+        if has_regex:
+            conn.create_function("REGEXP", 2, regexp)
+        cursor = conn.cursor()
+        cursor.execute(query, values)
+        if is_select_query:
+            rows = cursor.fetchall()
+            return rows
+    finally:
+        conn.commit()
+        cursor.close()
 
 
 def do_sql_query2(query, values, is_select_query=False):
@@ -319,6 +396,7 @@ def jozve_board(id):
     sql = "SELECT id, name FROM Files WHERE parent = ?"
     files = do_sql_query2(sql, [id], is_select_query=True)
 
+    print(parent)
     borad_text = "💠 {0} \n\n".format(parent[0][1])
     # borad_text += "برای دریافت فایل ها آیدی فایل را تایپ کنید\n\n"
     num_files = 0
@@ -406,30 +484,11 @@ def get_inline_jozve(id, user):
     return reply_markup
 
 
-def add_user_to_db(update, is_query=False):
-    if is_query:
-        chat_id = update.message.chat_id
-        user = update.from_user['username']
-
-    else:
-        chat_id = update.message.chat_id
-        user = update.message.from_user['username']
-
-    sql = "UPDATE Users SET tel_username = ? WHERE chat_id = ?"
-    values = [user, str(chat_id)]
-
-    try:
-        do_sql_query2(sql, values)
-    except:
-        sql = "INSERT INTO Users (chat_id,tel_username) VALUES (?,?,?)"
-        values = [str(chat_id), user]
-        do_sql_query2(sql, values)
-
-
 def LMS(update: Update, context: CallbackContext):
     global board_id
     global board_member_id
-    # global chat_ids
+    global current_dir
+    global chat_ids
 
     chat_id = update.message.chat_id
     user = update.message.from_user['username']
@@ -437,8 +496,8 @@ def LMS(update: Update, context: CallbackContext):
     update.message.bot.send_message(
         chat_id=CHANNEL_LOG, text=f'@{user} started bot!')
 
-    add_user_to_db(update)
-    # add_user_to_chat_ids(chat_id)
+    add_user_to_chat_ids(chat_id)
+    set_directory(update)
 
     is_group = update.message.chat.type != "private"
     username = update.message.chat.username
@@ -448,19 +507,25 @@ def LMS(update: Update, context: CallbackContext):
         update.message.reply_text(text=message)
         return ConversationHandler.END
 
-    # create_database()
+    create_database()
 
     chat_id = update.message.chat_id
-    sql = "SELECT status FROM Users WHERE chat_id = ?"
+    sql = "SELECT chat_id, username, password, id FROM Users WHERE chat_id = ?"
     value = [chat_id]
-    status = do_sql_query2(sql, value, is_select_query=True)[0][0]
+    user = do_sql_query2(sql, value, is_select_query=True)
 
     welcome_text = 'به ربات CE99 خوش آمدید!\nبرای استفاده از امکانات ربات باید دروس خود را ثبت کنید.\nلطفا نام کاربری خود در سامانه lms را وارد کنید:\nدر صورت انصراف روی /cancel کلیک کنید.'
 
-    if status == 0:
+    if not user:
+        sql = "INSERT INTO Users (chat_id) VALUES (?)"
+        value = [chat_id]
+        user = do_sql_query2(sql, value)
         update.message.reply_text(text=welcome_text)
         return 1
-    elif status in [1, 2, 3]:
+    elif not user[0][2]:
+        update.message.reply_text(text=welcome_text)
+        return 1
+    elif not user[0][3]:
         update.message.reply_text(
             text='فرایند بارگیری دیتا از lms مدتی طول می کشد.لطفا صبور باشید.\nدر صورتی که نام کاربری یا رمز عبور خود را اشتباه ثبت کرده اید روی /change کلیک کنید.')
         update.message.bot.send_message(
@@ -523,44 +588,93 @@ def get_password(update: Update, context: CallbackContext):
     return ConversationHandler.END
 
 
-def get_and_set_id(update: Update, context: CallbackContext):
-    # global chat_ids
+def get_and_set_id(update=None, context=None):
+    global chat_ids
     global board_id
     global board_member_id
 
-    sql = "SELECT chat_id, status FROM Users WHERE status = ? OR status = ?"
-    value = [2, 3]
-    users = do_sql_query2(sql, value, is_select_query=True)
-    if users:
-        for user in users:
-            chat_id = user[0]
-            status = user[1]
-            if Status[status] == 'wrong':
-                sql = "DELETE FROM Users WHERE chat_id = ?"
-                value = [chat_id]
-                do_sql_query2(sql, value, is_select_query=True)
-                text = "❌ نام کاربری یا رمز عبور شما اشتباه است!\nبرای اصلاح روی /lms کلیک کنید."
-                update.message.bot.send_message(
-                    chat_id=chat_id, text=text)
-            elif Status[status] == 'correct':
-                sql = 'UPDATE Users SET status = ? WHERE chat_id = ?'
-                value = [4, chat_id]
-                do_sql_query2(sql, value)
-                text = "✅ اطلاعات کلاس های شما با موفقیت از سامانه LMS دریافت شد!\nبرای تغییر نام کاربری و رمز عبور خود در سامانه می توانید روی "
-                text += f"<a href='https://its.iust.ac.ir/user/password'>لینک</a>"
-                text += " کلیک کنید."
-                update.message.bot.send_message(
-                    chat_id=chat_id, text=text, parse_mode=ParseMode.HTML)
+    sql = "SELECT * FROM Courses"
+    courses = do_sql_query2(sql, [], is_select_query=True)
 
-                reply_markup = courses_reply_markup(
-                    chat_id, show_courses=False)
+    # for course in courses:
+    #     id = course[0]
+    #     name = course[1]
+    #     sql = "INSERT INTO Directories (id,name) VALUES (?,?)"
+    #     try:
+    #         do_sql_query2(sql, [id, name])
+    #     except:
+    #         pass
 
-                text = courses_board(chat_id)
-                board_member_id[chat_id] = update.message.bot.send_message(
-                    chat_id=chat_id, text=text, parse_mode=ParseMode.HTML, reply_markup=reply_markup).message_id
-        update.message.reply_text("lms database edited!")
-    else:
-        update.message.reply_text("lms database is already update!")
+    sql = "SELECT id FROM ID"
+    rows = do_sql_query(sql, [], is_select_query=True)
+    ids = [str(row[0]) for row in rows]
+    for id in ids:
+        if str(id) not in chat_ids:
+            chat_ids.append(id)
+
+    sql = "INSERT INTO ID (id) VALUES (?)"
+    for id in chat_ids:
+        if str(id) not in ids:
+            do_sql_query(sql, [str(id)])
+
+    if update != None:
+        update.message.reply_text("database edited!")
+
+        sql = "SELECT chat_id, status FROM Users WHERE status = ? OR status = ?"
+        value = [2, 3]
+        users = do_sql_query2(sql, value, is_select_query=True)
+        if users:
+            for user in users:
+                chat_id = user[0]
+                status = user[1]
+                if Status[status] == 'wrong':
+                    sql = "DELETE FROM Users WHERE chat_id = ?"
+                    value = [chat_id]
+                    do_sql_query2(sql, value, is_select_query=True)
+                    text = "❌ نام کاربری یا رمز عبور شما اشتباه است!\nبرای اصلاح روی /lms کلیک کنید."
+                    update.message.bot.send_message(
+                        chat_id=chat_id, text=text)
+                elif Status[status] == 'correct':
+                    sql = 'UPDATE Users SET status = ? WHERE chat_id = ?'
+                    value = [4, chat_id]
+                    do_sql_query2(sql, value)
+                    text = "✅ اطلاعات کلاس های شما با موفقیت از سامانه LMS دریافت شد!\nبرای تغییر نام کاربری و رمز عبور خود در سامانه می توانید روی "
+                    text += f"<a href='https://its.iust.ac.ir/user/password'>لینک</a>"
+                    text += " کلیک کنید."
+                    update.message.bot.send_message(
+                        chat_id=chat_id, text=text, parse_mode=ParseMode.HTML)
+
+                    reply_markup = courses_reply_markup(
+                        chat_id, show_courses=False)
+
+                    text = courses_board(chat_id)
+                    board_member_id[chat_id] = update.message.bot.send_message(
+                        chat_id=chat_id, text=text, parse_mode=ParseMode.HTML, reply_markup=reply_markup).message_id
+            update.message.reply_text("lms database edited!")
+        else:
+            update.message.reply_text("lms database is already update!")
+
+
+def start(update: Update, context: CallbackContext):
+
+    global board_id
+    global board_member_id
+    global current_dir
+    global chat_ids
+
+    chat_id = update.message.chat_id
+    user = update.message.from_user['username']
+
+    update.message.bot.send_message(
+        chat_id=CHANNEL_LOG, text=f'@{user} started bot!')
+
+    add_user_to_chat_ids(chat_id)
+    set_directory(update)
+
+    board_member_id[chat_id] = update.message.reply_text(text=create_board(
+        current_dir), parse_mode=ParseMode.HTML, reply_markup=get_inline_keyboard(current_dir)).message_id
+
+    return ConversationHandler.END
 
 
 def regexp(regex, expression):
@@ -722,9 +836,9 @@ def ADD_File_Log(update: Update, context: CallbackContext):
 
     users = []
     if command == "/yes":
-        for User in all_users_for_callback:
-            if str(course_id) in User[1].split(","):
-                users.append(User[0])
+        for user in all_users_for_callback:
+            if str(course_id) in user[1].split(","):
+                users.append(user[0])
         send_to_all(update, message, file_id, users)
 
     elif command == "/no":
@@ -755,7 +869,15 @@ def get_file_name(update):
         return -1
 
 
+def change_dead_line_log(update: Update, dltext):
+    message = f"✅ یک ددلاین ویرایش شد!"
+    message += "\n"
+    message += dltext
+    send_to_all(update, message)
+
+
 def send_to_all(update: Update, message, file_id=None, users=[]):
+    get_and_set_id()
     message_id = update.message.bot.send_message(
         chat_id=CHANNEL_CHAT_LOG, text=message).message_id
 
@@ -765,15 +887,37 @@ def send_to_all(update: Update, message, file_id=None, users=[]):
             "دریافت", callback_data=str(data))]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
+    print(chat_ids)
     if file_id != None:
-        for id in users:
+        if users:
+            for id in users:
+                try:
+                    update.message.bot.send_message(
+                        chat_id=id, text=message, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+                except:
+                    print(id)
+        else:
+            for id in chat_ids:
+                try:
+                    update.message.bot.send_message(
+                        chat_id=id, text=message, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+                except:
+                    print(id)
+    else:
+        for id in chat_ids:
             try:
-                update.message.bot.send_message(
-                    chat_id=id, text=message, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+                update.message.bot.copy_message(
+                    chat_id=id, from_chat_id=CHANNEL_CHAT_LOG, message_id=message_id)
             except:
                 print(id)
-
     update.message.reply_text(text='ended!')
+
+
+def set_directory(update: Update):
+    global current_dir
+    user = update.message.from_user['username']
+    current_dir = MAIN_DIR_NAME
+    members[user] = MAIN_DIR_NAME
 
 
 def cancel(update: Update, context: CallbackContext):
@@ -783,8 +927,10 @@ def cancel(update: Update, context: CallbackContext):
 
 
 def send_to_all_user(update: Update, context: CallbackContext):
+    get_and_set_id()
     chat_id = update.message.chat_id
     message_id = update.message.message_id
+    print(chat_ids)
     for id in chat_ids:
         try:
             update.message.bot.copy_message(
@@ -795,9 +941,11 @@ def send_to_all_user(update: Update, context: CallbackContext):
 
 
 def is_admin(update: Update, have_message=True):
+    global current_dir
     chat_id = update.message.chat_id
     is_group = update.message.chat.type != "private"
     user = admins.get(update.message.from_user['username'])
+    current_dir = members.get(update.message.from_user['username'])
 
     if is_group:
         if have_message:
@@ -815,6 +963,57 @@ def is_admin(update: Update, have_message=True):
     return True
 
 
+def rename_dir_or_file(update: Update, context: CallbackContext):
+    """Rename specific directory or file in the current directory when the command /rnd or /rnf is issued"""
+    IsAdmin = is_admin(update)
+    if not IsAdmin:
+        return
+
+    global current_dir
+    global board_id
+    global board_member_id
+
+    chat_id = update.message.chat_id
+    command = update.message.text[1:4]
+    recieved_params = update.message.text[5:]
+    old_name = recieved_params.split(",")[0]
+    new_name = recieved_params.split(",")[1]
+    current_dir = members.get(update.message.from_user['username'])
+
+    if command == "rnd":
+        sql = "SELECT parent, name FROM info"
+        dirs = do_sql_query(sql, [], is_select_query=True)
+        for dir in dirs:
+            old_parent = current_dir + f"/{old_name}"
+            if dir[0].find(old_parent) == 0:
+                sql = "UPDATE info SET parent = ? WHERE parent = ?"
+                values = [current_dir +
+                          f"/{new_name}" + dir[0][len(old_parent):], dir[0]]
+                do_sql_query(sql, values)
+        sql = "UPDATE info SET name = ? WHERE type = 'dir' AND name = ? AND parent = ?"
+        values = [new_name, old_name, current_dir]
+        do_sql_query(sql, values)
+        message = "succesfully changed!"
+        update.message.bot.send_message(chat_id=chat_id, text=message)
+
+    elif command == 'rnf':
+        sql = "UPDATE info SET name = ? WHERE type = 'file' AND id = ?"
+        values = [new_name, old_name]
+        try:
+            do_sql_query(sql, values)
+            message = "succesfully changed!"
+            update.message.bot.send_message(chat_id=chat_id, text=message)
+        except:
+            message = "error in database!"
+            update.message.bot.send_message(chat_id=chat_id, text=message)
+
+    try:
+        update.message.bot.edit_message_text(chat_id=chat_id, message_id=board_member_id[chat_id], text=create_board(
+            current_dir), parse_mode=ParseMode.HTML, reply_markup=get_inline_keyboard(current_dir))
+    except:
+        pass
+
+
 def get_files(update: Update, context: CallbackContext):
     """Send specific file in the current directory when id is issued"""
     global CHANNEL_ID
@@ -822,6 +1021,8 @@ def get_files(update: Update, context: CallbackContext):
     message_text = str(update.message.text)
     username = update.message.from_user['username']
     is_group = update.message.chat.type != "private"
+
+    add_user_to_chat_ids(chat_id)
 
     if message_text.isalnum():
         try:
@@ -841,9 +1042,11 @@ def get_all_files(query):
     chat_id = query.message.chat_id
     username = query.from_user['username']
     dir_id = query.data.split()[1]
+    print(dir_id)
     sql = "SELECT id FROM Files WHERE parent = ?"
     values = [int(dir_id)]
     file_ids = do_sql_query2(sql, values, is_select_query=True)
+    print(file_ids)
     c = 0
     for file_id in file_ids:
         # try:
@@ -865,6 +1068,12 @@ def clear_illegal_commands(update: Update, context: CallbackContext):
     chat_id = update.message.chat_id
     message_id = update.message.message_id
     update.message.bot.delete_message(chat_id=chat_id, message_id=message_id)
+
+
+def add_user_to_chat_ids(chat_id):
+    global chat_ids
+    if str(chat_id) not in chat_ids:
+        chat_ids.append(str(chat_id))
 
 
 def get_deadline(course_id):
@@ -972,13 +1181,11 @@ def get_deadlines(update: Update, context: CallbackContext, query=None):
 
     if query:
         update = query
-        add_user_to_db(update, is_query=True)
         user = update.from_user['username']
         chat_id = update.message.chat_id
         message_id = update.message.message_id
         board_member_id[chat_id] = message_id
     else:
-        add_user_to_db(update)
         user = update.message.from_user['username']
         chat_id = update.message.chat_id
 
@@ -1046,14 +1253,47 @@ def Inline_buttons(update: Update, context: CallbackContext):
     user = update.callback_query.from_user['username']
     is_group = query.message.chat.type != "private"
 
+    add_user_to_chat_ids(chat_id)
+
     try:
         current_dir = members[user]
     except:
         members[user] = MAIN_DIR_NAME
         current_dir = members[user]
 
-    if query.data.split()[0] == 'get':
+    if query.data == 'back_button':
+        previous_dir = current_dir.rsplit('/', 1)[0]
+        current_dir = previous_dir
+        members[user] = current_dir
+        try:
+            update.callback_query.edit_message_text(text=create_board(
+                current_dir), parse_mode=ParseMode.HTML, reply_markup=get_inline_keyboard(current_dir))
+        except:
+            pass
+        query.answer(text=current_dir)
+
+    elif query.data == 'back_lms':
+        try:
+            update.callback_query.edit_message_text(text=create_board(
+                current_dir), parse_mode=ParseMode.HTML, reply_markup=get_inline_keyboard(current_dir))
+        except:
+            pass
+        query.answer(text=current_dir)
+
+    elif query.data == 'home_button':
+        current_dir = MAIN_DIR_NAME
+        members[user] = current_dir
+        try:
+            update.callback_query.edit_message_text(text=create_board(
+                current_dir), parse_mode=ParseMode.HTML, reply_markup=get_inline_keyboard(current_dir))
+        except:
+            pass
+        query.answer(text=MAIN_DIR_NAME)
+
+    elif query.data.split()[0] == 'get':
         id = query.data.split()[1]
+
+        add_user_to_chat_ids(chat_id)
 
         if is_group:
             query.message.bot.copy_message(
@@ -1235,6 +1475,33 @@ def Inline_buttons(update: Update, context: CallbackContext):
         query.answer(text='ادمین')
         return 12
 
+    else:
+        current_dir = query.data
+        members[user] = current_dir
+        try:
+            update.callback_query.edit_message_text(text=create_board(
+                current_dir), parse_mode=ParseMode.HTML, reply_markup=get_inline_keyboard(current_dir))
+        except:
+            pass
+        query.answer(text=current_dir)
+
+    return ConversationHandler.END
+
+
+def send_naghd(update: Update, context: CallbackContext):
+    chat_id = update.message.chat_id
+    message_id = update.message.message_id
+    username = update.message.from_user['username']
+
+    try:
+        update.message.bot.send_message(
+            chat_id=CHANNEL_NAGHD, text=f"کاربر @{username} یک نقد ثبت کرد:")
+        update.message.bot.copy_message(
+            chat_id=CHANNEL_NAGHD, from_chat_id=chat_id, message_id=message_id)
+        update.message.reply_text(text="پیام شما با موفقیت ارسال شد!")
+    except:
+        pass
+
     return ConversationHandler.END
 
 
@@ -1333,6 +1600,8 @@ def main():
 
     dispatcher.add_handler(LMS_handler)
 
+    dispatcher.add_handler(CommandHandler("rnf", rename_dir_or_file))
+    dispatcher.add_handler(CommandHandler("rnd", rename_dir_or_file))
     dispatcher.add_handler(CommandHandler("update", get_and_set_id))
     dispatcher.add_handler(CommandHandler("all_courses", all_courses))
     dispatcher.add_handler(CommandHandler("deadline", get_deadlines))
@@ -1344,6 +1613,7 @@ def main():
         },
         fallbacks=[CommandHandler('cancel', cancel)]
     )
+
     dispatcher.add_handler(send_handler)
 
     add_remove_handler = ConversationHandler(
