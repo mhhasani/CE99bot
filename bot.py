@@ -412,14 +412,13 @@ def add_user_to_db(update, is_query=False):
         chat_id = update.message.chat_id
         user = update.message.from_user['username']
 
-    sql = "UPDATE Users SET tel_username = ? WHERE chat_id = ?"
-    values = [user, str(chat_id)]
-
+    sql = "INSERT INTO Users (chat_id,tel_username) VALUES (?,?)"
+    values = [str(chat_id), user]
     try:
         do_sql_query2(sql, values)
     except:
-        sql = "INSERT INTO Users (chat_id,tel_username) VALUES (?,?)"
-        values = [str(chat_id), user]
+        sql = "UPDATE Users SET tel_username = ? WHERE chat_id = ?"
+        values = [user, str(chat_id)]
         do_sql_query2(sql, values)
 
 
