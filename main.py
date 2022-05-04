@@ -195,16 +195,13 @@ def start(chat_id, username, password):
 sql = "SELECT * FROM Users"
 Users = do_sql_query(sql, [], is_select_query=True)
 for User in Users:
-    if User[0] and User[1] and User[2] and not User[3]:
+    if User[7] == 1:
         try:
             start(User[0], User[1], User[2])
             print(User[0])
         except:
-            sql = "DELETE FROM Users WHERE chat_id = ?"
-            value = [User[0]]
-            do_sql_query(sql, value)
-            sql = "INSERT INTO Users (chat_id,status) VALUES (?,?)"
-            value = [User[0], 2]
+            sql = "UPDATE Users SET status = ? WHERE chat_id = ?"
+            value = [2, User[0]]
             do_sql_query(sql, value)
 
 sql = "SELECT * FROM Courses"

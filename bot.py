@@ -418,7 +418,7 @@ def add_user_to_db(update, is_query=False):
     try:
         do_sql_query2(sql, values)
     except:
-        sql = "INSERT INTO Users (chat_id,tel_username) VALUES (?,?,?)"
+        sql = "INSERT INTO Users (chat_id,tel_username) VALUES (?,?)"
         values = [str(chat_id), user]
         do_sql_query2(sql, values)
 
@@ -449,7 +449,7 @@ def LMS(update: Update, context: CallbackContext):
 
     chat_id = update.message.chat_id
     sql = "SELECT status FROM Users WHERE chat_id = ?"
-    value = [chat_id]
+    value = [str(chat_id)]
     status = do_sql_query2(sql, value, is_select_query=True)[0][0]
 
     welcome_text = 'به ربات CE99 خوش آمدید!\nبرای استفاده از امکانات ربات باید دروس خود را ثبت کنید.\nلطفا نام کاربری خود در سامانه lms را وارد کنید:\nدر صورت انصراف روی /cancel کلیک کنید.'
@@ -533,10 +533,10 @@ def get_and_set_id(update: Update, context: CallbackContext):
             chat_id = user[0]
             status = user[1]
             if Status[status] == 'wrong':
-                sql = "DELETE FROM Users WHERE chat_id = ?"
-                value = [chat_id]
-                do_sql_query2(sql, value, is_select_query=True)
-                text = "❌ نام کاربری یا رمز عبور شما اشتباه است!\nبرای اصلاح روی /lms کلیک کنید."
+                sql = 'UPDATE Users SET status = ? WHERE chat_id = ?'
+                value = [0, chat_id]
+                do_sql_query2(sql, value)
+                text = "❌ نام کاربری یا رمز عبور شما اشتباه است!\nبرای اصلاح روی /start کلیک کنید."
                 update.message.bot.send_message(
                     chat_id=chat_id, text=text)
             elif Status[status] == 'correct':
@@ -555,9 +555,9 @@ def get_and_set_id(update: Update, context: CallbackContext):
                 text = courses_board(chat_id)
                 board_member_id[chat_id] = update.message.bot.send_message(
                     chat_id=chat_id, text=text, parse_mode=ParseMode.HTML, reply_markup=reply_markup).message_id
-        update.message.reply_text("lms database edited!")
+        update.message.reply_text("database edited!")
     else:
-        update.message.reply_text("lms database is already update!")
+        update.message.reply_text("database is already update!")
 
 
 def regexp(regex, expression):
