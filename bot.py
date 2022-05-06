@@ -158,6 +158,27 @@ def courses_reply_markup(chat_id, show_courses=True, jozve=None, user=None):
 
 def all_courses(update: Update, context: CallbackContext):
     chat_id = update.message.chat_id
+    username = update.message.from_user['username']
+
+    is_group = update.message.chat.type != "private"
+
+    if is_group:
+        message = "مشاهده دروس در گروه ها امکان پذیر نمی باشد."
+        update.message.reply_text(text=message)
+        return
+
+    sql = "SELECT status FROM Users WHERE chat_id = ?"
+    value = [str(chat_id)]
+    status = do_sql_query2(sql, value, is_select_query=True)[0][0]
+
+    text = '❌ این امکان فقط برای کاربرانی که دروس خود را ثبت کرده اند فعال می باشد.برای ثبت دروس خود روی /start کلیک کنید.'
+
+    if status == 0:
+        update.message.reply_text(text=text)
+        update.message.bot.send_message(
+            chat_id=CHANNEL_LOG, text=f'@{username} clicked on /all_courses')
+        return
+
     keyboard = []
     sql = "SELECT id,name FROM Courses"
     value = []
@@ -168,6 +189,8 @@ def all_courses(update: Update, context: CallbackContext):
     reply_markup = InlineKeyboardMarkup(keyboard)
     update.message.bot.send_message(chat_id=chat_id, text='همه دروس:',
                                     parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+    update.message.bot.send_message(
+        chat_id=CHANNEL_LOG, text=f'@{username} clicked on /all_courses')
 
 
 def courses_board(chat_id):
