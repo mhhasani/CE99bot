@@ -1346,8 +1346,8 @@ def main():
         "5222043208:AAER54ZwJlJFF3oCezDK4Gb1z0TRCk3gSK8", use_context=True)
 
     dispatcher = updater.dispatcher
-    j = updater.job_queue
-    j.run_repeating(callback_minute, interval=1800, first=1380)
+    # j = updater.job_queue
+    # j.run_repeating(callback_minute, interval=1800, first=1380)
 
     LMS_handler = ConversationHandler(
         entry_points=[CommandHandler("start", LMS)],
