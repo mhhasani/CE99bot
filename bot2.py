@@ -14,8 +14,6 @@ import re
 
 from datetime import datetime, timedelta
 
-import requests
-from bs4 import BeautifulSoup
 
 all_courses_for_callback = None
 all_users_for_callback = None
@@ -27,17 +25,6 @@ seshanbe = 'سه شنبه'
 charshanbe = 'چهارشنبه'
 panjshanbe = 'پنجشنبه'
 jome = 'جمعه'
-
-days_dic_lms = {
-    shanbe: 0,
-    yekshanbe: 1,
-    doshanbe: 2,
-    seshanbe: 3,
-    charshanbe: 4,
-    panjshanbe: 5,
-    jome: 6,
-}
-
 
 jozve_member_id = {}
 board_member_id = {}
@@ -552,7 +539,6 @@ def get_password(update: Update, context: CallbackContext):
         text='فرایند بارگیری دیتا از lms مدتی طول می کشد.لطفا صبور باشید.\nدر صورتی که نام کاربری یا رمز عبور خود را اشتباه ثبت کرده اید روی /change کلیک کنید.')
     update.message.bot.send_message(
         chat_id=CHANNEL_LOG, text=f'کاربر @{user} اطلاعات lms خود را ثبت کرد.')
-    start(update,context)
     return ConversationHandler.END
 
 
@@ -591,6 +577,9 @@ def get_and_set_id(update: Update, context: CallbackContext):
                 text = courses_board(chat_id)
                 board_member_id[chat_id] = update.message.bot.send_message(
                     chat_id=chat_id, text=text, parse_mode=ParseMode.HTML, reply_markup=reply_markup).message_id
+        update.message.reply_text("database edited!")
+    else:
+        update.message.reply_text("database is already update!")
 
 
 def regexp(regex, expression):
@@ -1352,105 +1341,6 @@ def message(update: Update, context: CallbackContext):
     return 1
 
 
-def start(update: Update, context: CallbackContext):
-    sql = "SELECT * FROM Users"
-    Users = do_sql_query2(sql, [], is_select_query=True)
-    for User in Users:
-        if User[7] == 1:
-            try:
-                chat_id = User[0]
-                username = User[1]
-                password = User[2]
-                dic_course = {}
-                user = {}
-                url = 'https://lms.iust.ac.ir/login/index.php'
-                with requests.session() as session:
-                    response = session.get(url)
-                    soup = BeautifulSoup(response.text, 'lxml')
-                    url = soup.find(class_="btn btn-primary btn-block")['href']
-                    response = session.get(url)
-                    data = {
-                        'name': username,
-                        "pass": password,
-                        # "form_build_id": "form-I0t7Yj6NBHjmQPhNqOaulhhjaf4BEqcKxpTDZbfwYvk",
-                        "form_id": "oauth2_server_authenticate_form",
-                        "op": "ورود"
-                    }
-                    response = session.post(
-                        'https://its.iust.ac.ir/oauth2/autheticate', data=data)
-                    response = session.get('https://lms.iust.ac.ir/user/profile.php')
-                    soup = BeautifulSoup(response.text, 'lxml')
-
-                    user['name'] = soup.find(class_="contentnode fullname").span.text
-
-                    user['id'] = soup.find(
-                        class_="contentnode idnumber aduseropt").dd.text.strip('S:')
-                    user['department'] = soup.find(
-                        class_="contentnode department aduseropt").dd.text
-                    user['chat_id'] = chat_id
-
-                    courses = soup.find(
-                        'li', class_="contentnode courseprofiles").find_all('a')
-                    response = session.get(courses[-1]['href'])
-                    soup = BeautifulSoup(response.text, 'lxml')
-                    courses = soup.find(
-                        'li', class_="contentnode courseprofiles").find_all('a')
-                    for i in range(len(courses)):
-                        course = courses[i]
-                        dic_course[course.text] = {'id': "https://lms.iust.ac.ir/course/view.php?id=" +
-                                                course['href'].split("&course=")[1]}
-                    for key, course in dic_course.items():
-                        response = session.get(course['id'])
-                        soup = BeautifulSoup(response.text, 'lxml')
-                        try:
-                            adobe = soup.find(
-                                class_="activity adobeconnect modtype_adobeconnect").find('a')['href']
-                        except:
-                            break
-                        # https://lms.iust.ac.ir/mod/adobeconnect/view.php?id=413574
-                        dic_course[key]['id'] = adobe.split('id=')[-1]
-
-                        response = session.get(adobe)
-                        soup = BeautifulSoup(response.text, 'lxml')
-                        class_time = soup.find(class_="aconmeetinforow").find_all(
-                            class_="aconlabeltitle")[-1].text
-                        d_c = class_time.split('از ساعت')
-                        days = d_c[0].split('زمان تشکیل جلسه :هر')[-1].split(' و ')
-                        days_list = ""
-                        for day in days:
-                            day = day.strip(' ')
-                            days_list += str(days_dic_lms[day])+","
-                        clock = d_c[-1].split(' ')[1]
-                        dic_course[key]['days'] = days_list
-                        dic_course[key]['clock'] = clock
-
-                    str_courses_id = ""
-                    for k, v in dic_course.items():
-                        sql = "INSERT INTO Courses (id,name,clock,days) VALUES (?,?,?,?)"
-                        try:
-                            values = [dic_course[k]['id'], k, dic_course[k]
-                                    ['clock'], str(dic_course[k]['days'])]
-                        except:
-                            break
-                        str_courses_id += dic_course[k]['id'] + ","
-                        try:
-                            do_sql_query2(sql, values)
-                        except:
-                            continue
-
-                    sql = "UPDATE Users SET id = ?, name = ?, department = ?, courses = ? ,status = ? WHERE chat_id = ?"
-                    values = [user['id'], user['name'], user['department'],
-                            str_courses_id, 3, user['chat_id']]
-                    do_sql_query2(sql, values)
-                print(User[0])
-            except:
-                sql = "UPDATE Users SET status = ? WHERE chat_id = ?"
-                value = [2, User[0]]
-                do_sql_query2(sql, value)
-
-    get_and_set_id(update,context)
-
-
 def main():
     updater = Updater(
         "5222043208:AAER54ZwJlJFF3oCezDK4Gb1z0TRCk3gSK8", use_context=True)
@@ -1470,10 +1360,9 @@ def main():
 
     dispatcher.add_handler(LMS_handler)
 
-    # dispatcher.add_handler(CommandHandler("update", get_and_set_id))
+    dispatcher.add_handler(CommandHandler("update", get_and_set_id))
     dispatcher.add_handler(CommandHandler("all_courses", all_courses))
     dispatcher.add_handler(CommandHandler("deadline", get_deadlines))
-    # dispatcher.add_handler(CommandHandler("lms", start))
 
     send_handler = ConversationHandler(
         entry_points=[CommandHandler('send', message)],
