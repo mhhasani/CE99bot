@@ -14,8 +14,11 @@ def static_data_import_db(request):
 
 
 def crawl_users_info(request):
-    CreateNewUser.apply()
-    return JsonResponse({"status": "OK"})
+    # try:
+        CreateNewUser.apply()
+        return JsonResponse({"status": "OK"})
+    # except:
+    #     return JsonResponse({"status": "error"})
 
 
 def start_bot(request, chat_id):
@@ -45,7 +48,7 @@ def get_userpass(request, chat_id, lms_username, lms_password):
         user.lms_password = lms_password
         user.status = UserStatus.objects.get(name="waiting")
         user.save()
-        return JsonResponse({"status": "OK"})
+        return crawl_users_info(request)
     else:
         return JsonResponse({"status": "error"})
 
