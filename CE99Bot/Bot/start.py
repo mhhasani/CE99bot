@@ -1,3 +1,4 @@
+from email import message
 from telegram import (Update,
                       ParseMode,
                       InlineKeyboardMarkup,
@@ -36,33 +37,45 @@ def get_user_telegram_info_from_update(update: Update, context: CallbackContext)
 def start(update: Update, context: CallbackContext):
     user = get_user_telegram_info_from_update(update, context)
     response = send_request('start_bot', [user['chat_id']])
+
     if response['status'] == 'authenticated':
         update.message.reply_text(f"Welcome {user['first_name']} {user['last_name']}!")
+
     elif response['status'] in ['not_authenticated', 'created']:
         update.message.reply_text(f"Welcome {user['first_name']} {user['last_name']}!")
         update.message.reply_text(f"Please enter your student number and password to authenticate yourself.")
         return GET_USERPASS
+
     else:
         update.message.reply_text('Error')
-    ConversationHandler.END
+        
+    return ConversationHandler.END
 
 def get_userpass(update: Update, context: CallbackContext):
     user = get_user_telegram_info_from_update(update, context)
-    lms_username = update.message.text.split('\n')[0]
-    lms_password = update.message.text.split('\n')[1]
+    message = update.message.text
+    if len(message.split()) != 2:
+        update.message.reply_text('Please enter your student number and password to authenticate yourself.')
+        return GET_USERPASS
+        
+    lms_username = message.split('\n')[0]
+    lms_password = message.split('\n')[1]
     response = send_request('get_userpass', [user['chat_id'], lms_username, lms_password])
 
     if response['status'] == 'OK':
         update.message.reply_text('OK')
-        ConversationHandler.END
+        return ConversationHandler.END
+
     elif response['status'] == 'error':
         update.message.reply_text('Error')
         return GET_USERPASS
 
 def static_data_import_db(update: Update, context: CallbackContext):
     response = send_request('static_data_import_db', [])
+
     if response['status'] == 'OK':
         update.message.reply_text('OK')
+
     elif response['status'] == 'error':
         update.message.reply_text('Error')
     

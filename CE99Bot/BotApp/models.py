@@ -19,6 +19,7 @@ class Department(models.Model):
 
 class Teacher(models.Model):
     id = models.AutoField(primary_key=True)
+    lms_id = models.CharField(max_length=50, null=True)
     name = models.CharField(max_length=500, unique=True)
 
     def __str__(self):
@@ -64,7 +65,7 @@ class Course(models.Model):
 
 class ClockTime(models.Model):
     id = models.AutoField(primary_key=True)
-    time = models.TimeField()
+    time = models.CharField(max_length=50, unique=True)
 
     def __str__(self):
         return self.time
@@ -105,9 +106,9 @@ class UserCourseType(models.Model):
 
 class UserCourse(models.Model):
     id = models.AutoField(primary_key=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    user_type = models.ForeignKey(UserCourseType, on_delete=models.CASCADE, null=True)
-    course = models.ForeignKey(Course, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
+    user_type = models.ForeignKey(UserCourseType, on_delete=models.DO_NOTHING, null=True)
+    course = models.ForeignKey(Course, on_delete=models.DO_NOTHING)
 
     def __str__(self):
         return self.user.username + " - " + self.course.name
