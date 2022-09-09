@@ -20,7 +20,16 @@ def send_request(url, options):
     response = requests.get(url)
     return response.json()
 
-
+def get_user_telegram_info_from_update(update: Update, context: CallbackContext):
+    result = {}
+    result['chat_id'] = update.message.chat_id
+    result['first_name'] = update.message.from_user['first_name']
+    result['last_name'] = update.message.from_user['last_name']
+    result['username'] = update.message.from_user['username']
+    result['is_group'] = update.message.chat.type != "private"
+    result['language_code'] = update.message.from_user['language_code']
+    return result
+    
 def static_data_import_db(update: Update, context: CallbackContext):
     response = send_request('static_data_import_db', [])
 

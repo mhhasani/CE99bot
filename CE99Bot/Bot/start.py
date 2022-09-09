@@ -17,16 +17,6 @@ from main_funcs import *
 
 
 
-def get_user_telegram_info_from_update(update: Update, context: CallbackContext):
-    result = {}
-    result['chat_id'] = update.message.chat_id
-    result['first_name'] = update.message.from_user['first_name']
-    result['last_name'] = update.message.from_user['last_name']
-    result['username'] = update.message.from_user['username']
-    result['is_group'] = update.message.chat.type != "private"
-    result['language_code'] = update.message.from_user['language_code']
-    return result
-
     
 def start(update: Update, context: CallbackContext):
     user = get_user_telegram_info_from_update(update, context)
