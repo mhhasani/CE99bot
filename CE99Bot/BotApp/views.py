@@ -1,8 +1,9 @@
-from .models import User, UserStatus
+from .models import *
 from .decorators import is_authenticated
-from .scripts import StaticDataImportDB, CreateNewUser
+from .scripts import StaticDataImportDB, CreateNewUser, UserCourseCUBE
 
 from django.http import JsonResponse
+from django.db.models import F
 
 
 def static_data_import_db(request):
@@ -11,6 +12,10 @@ def static_data_import_db(request):
         return JsonResponse({"status": "OK"})
     except:
         return JsonResponse({"status": "error"})
+
+def create_usercourse_cube(request):
+    UserCourseCUBE.apply()
+    return JsonResponse({"status": "OK"})
 
 
 def crawl_users_info(request):
@@ -62,3 +67,10 @@ def get_userpass(request, chat_id, lms_username, lms_password):
     else:
         return JsonResponse({"status": "error"})
 
+
+def show_main_table(request, chat_id):
+    user_courses = UserCourse_CUBE.objects.get(user__chat_id=chat_id)
+    dailycourse_info = user_courses.dailycourse_info
+    courses = user_courses.courses
+
+    return JsonResponse({"status": "OK", "dailycourse_info": dailycourse_info, "courses": courses})

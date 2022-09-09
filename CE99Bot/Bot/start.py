@@ -1,4 +1,7 @@
+from curses.panel import bottom_panel
+from datetime import datetime, timedelta
 from email import message
+import json
 from telegram import (Update,
                       ParseMode,
                       InlineKeyboardMarkup,
@@ -23,7 +26,8 @@ def start(update: Update, context: CallbackContext):
     response = send_request('start_bot', [user['chat_id'], user['username']])
 
     if response['status'] == 'authenticated':
-        update.message.reply_text(f"Welcome {user['first_name']} {user['last_name']}!")
+        ConversationHandler.END
+        return show_main_table(update, context)
 
     elif response['status'] in ['not_authenticated', 'created']:
         update.message.reply_text(RESPONSE_TEXTS['welcom'])
@@ -31,7 +35,7 @@ def start(update: Update, context: CallbackContext):
         return GET_USERPASS
 
     else:
-        update.message.reply_text('Error')
+        update.message.reply_text(RESPONSE_TEXTS['error'])
         
     return ConversationHandler.END
 
@@ -51,8 +55,9 @@ def get_userpass(update: Update, context: CallbackContext):
         return ConversationHandler.END
 
     elif response['status'] == 'error':
-        update.message.reply_text('Error')
+        update.message.reply_text(RESPONSE_TEXTS['error'])
         return GET_USERPASS
+
 
 
     

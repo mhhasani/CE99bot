@@ -111,9 +111,19 @@ class UserCourse(models.Model):
     course = models.ForeignKey(Course, on_delete=models.DO_NOTHING)
 
     def __str__(self):
+        return self.user.lms_username + " - " + self.course.name
+
+
+class UserCourse_CUBE(models.Model):
+    id = models.AutoField(primary_key=True)
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
+    dailycourse_info = models.JSONField(null=True)
+    courses = models.JSONField(null=True)
+
+    def __str__(self):
         return self.user.username + " - " + self.course.name
 
-
+        
 class Deadline(models.Model):
     id = models.AutoField(primary_key=True)
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
