@@ -5,7 +5,7 @@ from django.http import JsonResponse
 
 import requests
 from bs4 import BeautifulSoup
-from Bot.const import *
+from CE99Bot.config import *
 
 def login(username, password):
     url = 'https://lms.iust.ac.ir/login/index.php'

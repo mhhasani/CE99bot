@@ -13,15 +13,9 @@ from telegram.ext import (Updater,
 
 import requests
 from const import *
+from main_funcs import *
 
-base_url = 'http://127.0.0.1:8000/telegram/'
 
-def send_request(url, options):
-    url = base_url + url + '/'
-    for option in options:
-        url += f'{option}/'
-    response = requests.get(url)
-    return response.json()
 
 def get_user_telegram_info_from_update(update: Update, context: CallbackContext):
     result = {}
@@ -70,21 +64,5 @@ def get_userpass(update: Update, context: CallbackContext):
         update.message.reply_text('Error')
         return GET_USERPASS
 
-def static_data_import_db(update: Update, context: CallbackContext):
-    response = send_request('static_data_import_db', [])
 
-    if response['status'] == 'OK':
-        update.message.reply_text('OK')
-
-    elif response['status'] == 'error':
-        update.message.reply_text('Error')
-
-def crawl_teachers_info(update: Update, context: CallbackContext):
-    response = send_request('crawl_teachers_info', [])
-
-    if response['status'] == 'OK':
-        update.message.reply_text('OK')
-
-    elif response['status'] == 'error':
-        update.message.reply_text('Error')
     

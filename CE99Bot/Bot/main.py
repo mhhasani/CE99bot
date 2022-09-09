@@ -7,6 +7,7 @@ from telegram.ext import (Updater,
                           ConversationHandler,)
 from start import *
 from const import *
+from main_funcs import *
 
 def cancel(update: Update, context: CallbackContext):
     """Cancels and ends the conversation."""
