@@ -21,21 +21,31 @@ def crawl_users_info(request):
     #     return JsonResponse({"status": "error"})
 
 
-def start_bot(request, chat_id):
+def crawl_teachers_info(request):
+    # try:
+        CreateNewUser.crawl_teachers_info()
+        return JsonResponse({"status": "OK"})
+    # except:
+    #     return JsonResponse({"status": "error"})
+
+
+def start_bot(request, chat_id, username):
     user = User.objects.filter(chat_id=chat_id).first()
     if user:
+        user.telegram_username = username
+        user.save()
         if user.status.name in ["correct", "ended"]:
             return JsonResponse({"status": "authenticated"})
         else:
             return JsonResponse({"status": "not_authenticated"})
     else:
-        return initial_create_user(request, chat_id)
+        return initial_create_user(request, chat_id, username)
 
 
-def initial_create_user(request, chat_id):
+def initial_create_user(request, chat_id, username):
     try:
         status = UserStatus.objects.get(name="null")
-        User.objects.create(chat_id=chat_id, status=status)
+        User.objects.create(chat_id=chat_id, status=status, telegram_username=username)
         return JsonResponse({"status": "created"})
     except:
         return JsonResponse({"status": "error"})

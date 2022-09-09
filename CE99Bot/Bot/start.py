@@ -36,14 +36,14 @@ def get_user_telegram_info_from_update(update: Update, context: CallbackContext)
     
 def start(update: Update, context: CallbackContext):
     user = get_user_telegram_info_from_update(update, context)
-    response = send_request('start_bot', [user['chat_id']])
+    response = send_request('start_bot', [user['chat_id'], user['username']])
 
     if response['status'] == 'authenticated':
         update.message.reply_text(f"Welcome {user['first_name']} {user['last_name']}!")
 
     elif response['status'] in ['not_authenticated', 'created']:
-        update.message.reply_text(f"Welcome {user['first_name']} {user['last_name']}!")
-        update.message.reply_text(f"Please enter your student number and password to authenticate yourself.")
+        update.message.reply_text(RESPONSE_TEXTS['welcom'])
+        update.message.reply_text(RESPONSE_TEXTS['get_userpass'])
         return GET_USERPASS
 
     else:
@@ -55,7 +55,7 @@ def get_userpass(update: Update, context: CallbackContext):
     user = get_user_telegram_info_from_update(update, context)
     message = update.message.text
     if len(message.split()) != 2:
-        update.message.reply_text('Please enter your student number and password to authenticate yourself.')
+        update.message.reply_text(RESPONSE_TEXTS['get_userpass'])
         return GET_USERPASS
         
     lms_username = message.split('\n')[0]
@@ -72,6 +72,15 @@ def get_userpass(update: Update, context: CallbackContext):
 
 def static_data_import_db(update: Update, context: CallbackContext):
     response = send_request('static_data_import_db', [])
+
+    if response['status'] == 'OK':
+        update.message.reply_text('OK')
+
+    elif response['status'] == 'error':
+        update.message.reply_text('Error')
+
+def crawl_teachers_info(update: Update, context: CallbackContext):
+    response = send_request('crawl_teachers_info', [])
 
     if response['status'] == 'OK':
         update.message.reply_text('OK')

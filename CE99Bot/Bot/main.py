@@ -27,10 +27,12 @@ def main():
     )
 
     static_data_import_db_handler = CommandHandler('static_data_import_db', static_data_import_db)
+    crawl_teachers_info_handler = CommandHandler('crawl_teachers_info', crawl_teachers_info)
 
     # add handlers to dispatcher
     dispatcher.add_handler(start_handler)
     dispatcher.add_handler(static_data_import_db_handler)
+    dispatcher.add_handler(crawl_teachers_info_handler)
 
     updater.start_polling()
     updater.idle()

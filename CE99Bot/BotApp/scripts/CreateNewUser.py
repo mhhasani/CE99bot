@@ -1,9 +1,11 @@
+from select import select
+from unicodedata import name
 from BotApp.models import *
 from django.http import JsonResponse
 
 import requests
 from bs4 import BeautifulSoup
-
+from Bot.const import *
 
 def login(username, password):
     url = 'https://lms.iust.ac.ir/login/index.php'
@@ -59,7 +61,9 @@ def set_user_info(user, user_info, departments, statuses):
         user.status = statuses.get('wrong')
         return {"status": "wrong"}
 
+
 def crawl_course_info(session, soup):
+    all_courses = {course.name: course for course in Course.objects.all()}
     # Get the user's courses
     dic_course = {}
     courses = soup.find('li', class_="contentnode courseprofiles").find_all('a')
@@ -72,14 +76,20 @@ def crawl_course_info(session, soup):
         course_name = course.text
         course_term = course_name.split(" ")[-1]
         course_term = course_term[1:len(course_term) - 1]
-        course_view_link = "https://lms.iust.ac.ir/course/view.php?id=" + course_id    
-        course_info_link = "https://lms.iust.ac.ir/course/info.php?id=" + course_id
+        course_view_link = BASE_VIEW_LINK + course_id    
+        course_info_link = BASE_INFO_LINK + course_id
         course_is_active = False
-        dic_course[course_name] = {"id": course_id, "term": course_term, "view_link": course_view_link, "info_link": course_info_link, "is_active": course_is_active}
+        dic_course[course_name] = {"crawled":False, "id": course_id, "term": course_term, "view_link": course_view_link, "info_link": course_info_link, "is_active": course_is_active}
+        if course_name in all_courses:  
+            dic_course[course_name]["crawled"] = True
 
         response = session.get(course_view_link)
         soup = BeautifulSoup(response.text, 'lxml')
         # Get the user's courses' view link
+        if soup.find(id="editingbutton"):
+            dic_course[course_name]['user_course_type'] = "TA"
+        else:
+            dic_course[course_name]['user_course_type'] = "student"
         try:
             adobe = soup.find(class_="activity adobeconnect modtype_adobeconnect").find('a')['href']
             # https://lms.iust.ac.ir/mod/adobeconnect/view.php?id=413574
@@ -101,31 +111,26 @@ def crawl_course_info(session, soup):
             dic_course[course_name]['days'] = None
             dic_course[course_name]['clock'] = None
 
-        # Get the user's courses' info link
-        try:
-            response = session.get(course_info_link)
-            soup = BeautifulSoup(response.text, 'lxml')
-            teacher = soup.find(class_="teachers").find('a')
-            teacher_name = teacher.text
-            teacher_id = teacher['href'].split('id=')[-1].split('&')[0]
-            dic_course[course_name]['teacher_name'] = teacher_name
-            dic_course[course_name]['teacher_id'] = teacher_id
-        except:
-            dic_course[course_name]['teacher_name'] = None
-            dic_course[course_name]['teacher_id'] = None
+    return dic_course 
 
-    return dic_course    
 
 def set_user_courses(user, course_info, courses):
     terms = {term.name: term for term in Term.objects.all()}
     user_courses = {user_course.course: user_course for user_course in UserCourse.objects.all().filter(user=user)}
-    teachers = {teacher.lms_id: teacher for teacher in Teacher.objects.all()}
     days = {day.name: day for day in Day.objects.all()}
     clocks = {clock.time: clock for clock in ClockTime.objects.all()}
+    user_course_type = {usertype.name: usertype for usertype in UserCourseType.objects.all()}
 
 
     for course_name, course in course_info.items():
-        teacher = None
+        if course['crawled']:
+            course_obj = Course.objects.get(name=course_name)
+            if course_obj not in user_courses:
+                user_type = user_course_type.get(course['user_course_type'])
+                user_course = UserCourse.objects.create(user=user, course=course_obj, user_type=user_type)
+                user_courses[course_obj] = user_course
+            continue
+               
         term = None
         if course['term'] in terms:
             term = terms.get(course['term'])
@@ -134,17 +139,10 @@ def set_user_courses(user, course_info, courses):
             term = new_term
             terms[course['term']] = new_term
 
-        if course['teacher_id'] in teachers:
-            teacher = teachers.get(course['teacher_id'])
-        elif course['teacher_id']:
-            new_teacher = Teacher.objects.create(name=course['teacher_name'], lms_id=course['teacher_id'])
-            teacher = new_teacher
-            teachers[course['teacher_id']] = new_teacher
-
         if course_name in courses:
             course_obj = courses.get(course_name)
         else:
-            course_obj = Course.objects.create(name=course_name, code=course['id'], teacher=teacher, term=term)
+            course_obj = Course.objects.create(name=course_name, code=course['id'], term=term)
             courses[course_name] = course_obj
 
         if course['clock'] in clocks:
@@ -171,9 +169,61 @@ def set_user_courses(user, course_info, courses):
         if course_obj in user_courses:
             user_course = user_courses.get(course_obj)
         else:
-            user_course = UserCourse.objects.create(user=user, course=course_obj)
+            user_type = user_course_type.get(course['user_course_type'])
+            user_course = UserCourse.objects.create(user=user, course=course_obj, user_type=user_type)
             user_courses[course_obj] = user_course
    
+
+def crawl_teachers_info():
+    # login
+    session = login(USERNAME, PASSWORD)
+    if not session:
+        return None
+    print(USERNAME, "login!")
+    print("Getting teacher courses...")
+    # Get the user's courses' info link
+    dic_course = {}
+    courses = Course.objects.all().filter(teacher__isnull=True)
+    for course in courses:
+        course_name = course.name
+        course_id = course.code
+        course_info_link = BASE_INFO_LINK + course_id
+        dic_course[course_name] = {"id": course_id}
+        try:
+            response = session.get(course_info_link)
+            soup = BeautifulSoup(response.text, 'lxml')
+            teacher = soup.find(class_="teachers").find('a')
+            teacher_name = teacher.text
+            teacher_id = teacher['href'].split('id=')[-1].split('&')[0]
+            dic_course[course_name]['teacher_name'] = teacher_name
+            dic_course[course_name]['teacher_id'] = teacher_id
+        except:
+            dic_course[course_name]['teacher_name'] = None
+            dic_course[course_name]['teacher_id'] = None  
+
+    return set_courses_teacher(dic_course) 
+
+
+def set_courses_teacher(course_info):
+    print("Setting teacher courses...")
+    selected_courses = Course.objects.all().filter(teacher__isnull=True)
+    courses = {course.name: course for course in selected_courses}
+    teachers = {teacher.lms_id: teacher for teacher in Teacher.objects.all()}
+
+    for course_name, course in courses.items():
+        teacher = None
+        curr_course_info = course_info.get(course_name)
+        if not curr_course_info:
+            continue
+        if curr_course_info['teacher_id'] in teachers:
+            teacher = teachers.get(curr_course_info['teacher_id'])
+        elif curr_course_info['teacher_id']:
+            teacher = Teacher.objects.create(name=curr_course_info['teacher_name'], lms_id=curr_course_info['teacher_id'])
+            teachers[curr_course_info['teacher_id']] = teacher 
+
+        course.teacher = teacher
+    
+    selected_courses.bulk_update(selected_courses, ['teacher'])
 
 
 
