@@ -9,10 +9,7 @@ from start import *
 from const import *
 from main_funcs import *
 
-def cancel(update: Update, context: CallbackContext):
-    """Cancels and ends the conversation."""
-    update.message.reply_text(text='ended!')
-    return ConversationHandler.END
+
 
 def main():
     updater = Updater("5222043208:AAER54ZwJlJFF3oCezDK4Gb1z0TRCk3gSK8", use_context=True)
