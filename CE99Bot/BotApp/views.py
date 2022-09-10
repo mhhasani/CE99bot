@@ -74,3 +74,18 @@ def show_main_table(request, chat_id):
     courses = user_courses.courses
 
     return JsonResponse({"status": "OK", "dailycourse_info": dailycourse_info, "courses": courses})
+
+def show_course_table(request, course_id):
+    cdc = CourseDayClockTime.objects.filter(course__code=course_id)
+    course = Course.objects.get(code=course_id)
+    course_info = {
+        'course_name': course.name,
+        'course_code': course.code,
+        'course_teacher': course.teacher.name if course.teacher else None,
+        'course_term': course.term.name,
+        # 'course_department': course.department.name,
+        'course_days': [c.day.name for c in cdc],
+        'course_times': cdc.first().clock_time.time,
+    }
+
+    return JsonResponse({"status": "OK", "course_info": course_info})

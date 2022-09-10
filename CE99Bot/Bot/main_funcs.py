@@ -30,6 +30,11 @@ def cancel(update: Update, context: CallbackContext):
     
 def get_user_telegram_info_from_update(update: Update, context: CallbackContext):
     result = {}
+    if update.callback_query:
+        update = update.callback_query
+        result['is_callback'] = True
+    else:
+        result['is_callback'] = False
     result['chat_id'] = update.message.chat_id
     result['first_name'] = update.message.from_user['first_name']
     result['last_name'] = update.message.from_user['last_name']
@@ -86,12 +91,14 @@ def create_main_table_reply_markup(courses):
     c = 0
     bottom2 = []
     for course in courses:
-        course_name = course['course_name']
-        course_code = course['course_code']
+        course_name = courses[course]['course_name']
+        course_code = courses[course]['course_code']
         if len(bottom2) == 2:
             keyboard.append(bottom2)
             bottom2 = []
-        bottom2.append(InlineKeyboardButton(course_name.split('گروه')[0], callback_data=course_code))
+        callback_data=CALLBACK_DATA['course'] + ' ' +  course_code
+        text = course_name.split('گروه')[0]
+        bottom2.append(InlineKeyboardButton(text, callback_data=callback_data))
         c += 1
     if bottom2:
         keyboard.append(bottom2)
@@ -111,3 +118,50 @@ def show_main_table(update: Update, context: CallbackContext):
 
     elif response['status'] == 'error':
         update.message.reply_text(RESPONSE_TEXTS['error'])
+
+
+def create_course_table_text(course_info):
+    course_name = course_info['course_name']
+    course_code = course_info['course_code']
+    course_days = course_info['course_days']
+    course_times = course_info['course_times']
+    course_link = BASE_VIEW_LINK + course_code
+    course_teacher = course_info['course_teacher']
+    # user_type = course_info['user_type']
+
+
+    text = f"<b>📚 اطلاعات درس 📚</b>\n\n"
+    text += f"🔸<a href='{course_link}'>{course_name}</a>\n"
+    text += f"🔸روز ها: {' '.join(course_days)}\n"
+    text += f"🔸ساعت: {course_times}\n"
+    text += f"🔸استاد: {course_teacher}\n"
+    # text += f"🔸نوع کاربر: {user_type}\n"
+
+
+    return text
+
+
+def show_course_table(update: Update, context: CallbackContext):
+    user = get_user_telegram_info_from_update(update, context)
+    if user['is_callback']:
+        update = update.callback_query
+    course_id = update.data.split()[1]
+    response = send_request('show_course_table', [course_id])
+    if response['status'] == 'OK':
+        course_info = response['course_info']
+        text = create_course_table_text(course_info)
+        update.message.edit_text(text, parse_mode=ParseMode.HTML)
+
+    elif response['status'] == 'error':
+        update.message.reply_text(RESPONSE_TEXTS['error'])
+
+
+def Inline_buttons(update: Update, context: CallbackContext):
+    user = get_user_telegram_info_from_update(update, context)
+    query = update.callback_query
+    request = query.data.split()[0]
+    request_id = query.data.split()[1]
+
+    if request == 'course': 
+        show_course_table(update, context)   
+        query.answer(text="دریافت شد")

@@ -20,3 +20,7 @@ DAYS = {
     '5': 'پنجشنبه',
     '6': 'جمعه',
 }
+
+CALLBACK_DATA = {
+    'course': 'course',
+}

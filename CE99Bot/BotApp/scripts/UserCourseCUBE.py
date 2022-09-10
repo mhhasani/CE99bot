@@ -18,10 +18,10 @@ def apply():
                 'course_time': cdc.clock_time.time
             })
 
-        user_courses = []
+        user_courses = {}
         for user_course in user_active_courses:
             cdc = CourseDayClockTime.objects.filter(course=user_course.course)
-            user_courses.append({
+            user_courses[user_course.course.code] = {
                 'course_name': user_course.course.name,
                 'course_code': user_course.course.code,
                 'course_teacher': user_course.course.teacher.name if user_course.course.teacher else None,
@@ -30,7 +30,7 @@ def apply():
                 'course_days': [c.day.name for c in cdc],
                 'course_times': cdc.first().clock_time.time,
                 'user_type': user_course.user_type.name,
-            })
+            }
 
 
         UserCourse_CUBE.objects.create(user=user, dailycourse_info=days_dict, courses=user_courses)
