@@ -50,14 +50,29 @@ def get_userpass(update: Update, context: CallbackContext):
     lms_password = message.split('\n')[1]
     response = send_request('get_userpass', [user['chat_id'], lms_username, lms_password])
 
-    if response['status'] == 'OK':
-        update.message.reply_text('OK')
-        return ConversationHandler.END
+    if response['status'] == 'error':
+        update.message.reply_text(RESPONSE_TEXTS['lms_error'])
+    
+    elif response['status'] == 'correct':
+        response = send_request('update_status', [user['chat_id']])
+        if response['status'] == 'OK':
+            update.message.reply_text(RESPONSE_TEXTS['correct_userpass'], parse_mode=ParseMode.HTML)
+            return show_main_table(update, context)
+        else:
+            update.message.reply_text(RESPONSE_TEXTS['error'])
 
-    elif response['status'] == 'error':
+
+    elif response['status'] == 'wrong':
+        response = send_request('update_status', [user['chat_id']])
+        if response['status'] == 'OK':
+            update.message.reply_text(RESPONSE_TEXTS['incorrect_userpass'])
+        else:
+            update.message.reply_text(RESPONSE_TEXTS['error'])
+
+    else:
         update.message.reply_text(RESPONSE_TEXTS['error'])
-        return GET_USERPASS
 
+    return ConversationHandler.END
 
 
     

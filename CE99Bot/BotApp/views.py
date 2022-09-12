@@ -18,10 +18,10 @@ def create_usercourse_cube(request):
     return JsonResponse({"status": "OK"})
 
 
-def crawl_users_info(request):
+def crawl_users_info(request, chat_id):
     # try:
-        CreateNewUser.apply()
-        return JsonResponse({"status": "OK"})
+        status = CreateNewUser.apply(chat_id)
+        return JsonResponse({"status": status})
     # except:
     #     return JsonResponse({"status": "error"})
 
@@ -63,7 +63,7 @@ def get_userpass(request, chat_id, lms_username, lms_password):
         user.lms_password = lms_password
         user.status = UserStatus.objects.get(name="waiting")
         user.save()
-        return crawl_users_info(request)
+        return crawl_users_info(request, user.chat_id)
     else:
         return JsonResponse({"status": "error"})
 
@@ -89,3 +89,15 @@ def show_course_table(request, course_id):
     }
 
     return JsonResponse({"status": "OK", "course_info": course_info})
+
+def update_status(request, chat_id):
+    user = User.objects.filter(chat_id=chat_id).first()
+    if user:
+        if user.status.name == "correct":
+            user.status = UserStatus.objects.get(name="ended")
+        elif user.status.name == "wrong":
+            user.status = UserStatus.objects.get(name="null")
+        user.save()
+        return JsonResponse({"status": "OK"})
+    else:
+        return JsonResponse({"status": "error"})

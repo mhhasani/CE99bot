@@ -11,5 +11,6 @@ urlpatterns = [
     path('get_userpass/<int:chat_id>/<str:lms_username>/<str:lms_password>/', get_userpass, name='get_userpass'),
     path('show_main_table/<int:chat_id>/', show_main_table, name='show_main_table'),
     path('create_usercourse_cube/', create_usercourse_cube, name='create_usercourse_cube'),
-    path('show_course_table/<int:course_id>/', show_course_table, name='show_course_table')
+    path('show_course_table/<int:course_id>/', show_course_table, name='show_course_table'),
+    path('update_status/<int:chat_id>/', update_status, name='update_status'),
 ]

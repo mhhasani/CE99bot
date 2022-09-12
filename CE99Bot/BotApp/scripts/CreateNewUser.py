@@ -40,6 +40,7 @@ def crawl_user_info(session, user):
     except:
         return {"status": "Error", "session": session}
 
+
 def set_user_info(user, user_info, departments, statuses):
     status = user_info['status']
 
@@ -55,11 +56,11 @@ def set_user_info(user, user_info, departments, statuses):
             departments[user_info['department']] = new_department
 
         user.status = statuses.get('correct')
+        user.save()
         return {"status": "correct"}
 
     elif status == 'Error':
-        user.status = statuses.get('wrong')
-        return {"status": "wrong"}
+        return {"status": "error"}
 
 
 def crawl_course_info(session, soup):
@@ -227,31 +228,32 @@ def set_courses_teacher(course_info):
 
 
 
-def apply():
-    users = User.objects.all().filter(status__name='waiting')
+def apply(chat_id):
+    user = User.objects.all().filter(chat_id=chat_id).first()
     departments = {department.name: department for department in Department.objects.all()}
     statuses = {status.name: status for status in UserStatus.objects.all()}
     courses = {course.name: course for course in Course.objects.all()}
 
-    for user in users:
-        session = login(user.lms_username, user.lms_password)
-        if not session:
-            continue
+    session = login(user.lms_username, user.lms_password)
+    if not session:
+        user.status = statuses.get('wrong')
+        user.save()
+        print(user.lms_username, "login failed!")
+        return 'error'
 
-        print(user.lms_username, "login!")
-        print("Getting user info...")
-        user_info = crawl_user_info(session, user)
-        print("Setting user info...")
-        status = set_user_info(user, user_info, departments, statuses)['status']
-        if status == 'wrong':
-            continue
-        elif status == 'correct':
-            print("Getting user courses...")
-            course_info = crawl_course_info(session, user_info['soup'])
-            print("Setting user courses...")
-            set_user_courses(user, course_info, courses)
+    print(user.lms_username, "login!")
+    print("Getting user info...")
+    user_info = crawl_user_info(session, user)
+    print("Setting user info...")
+    status = set_user_info(user, user_info, departments, statuses)['status']
+    if status == 'error':
+        return 'wrong'
 
+    elif status == 'correct':
+        print("Getting user courses...")
+        course_info = crawl_course_info(session, user_info['soup'])
+        print("Setting user courses...")
+        set_user_courses(user, course_info, courses)
 
-
-    users.bulk_update(users, ['status', 'full_name', 'student_id', 'department'])
+    return 'correct'
 

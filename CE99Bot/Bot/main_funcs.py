@@ -15,7 +15,7 @@ from const import *
 import requests
 
 def send_request(url, options):
-    url = SERVER_UEL + url + '/'
+    url = SERVER_URL + url + '/'
     for option in options:
         url += f'{option}/'
     response = requests.get(url)
