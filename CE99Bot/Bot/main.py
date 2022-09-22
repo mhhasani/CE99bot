@@ -8,6 +8,8 @@ from telegram.ext import (Updater,
 from start import *
 from const import *
 from main_funcs import *
+from course import *
+from inline_buttons import *
 
 
 

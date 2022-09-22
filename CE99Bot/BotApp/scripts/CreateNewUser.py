@@ -1,7 +1,4 @@
-from select import select
-from unicodedata import name
 from BotApp.models import *
-from django.http import JsonResponse
 
 import requests
 from bs4 import BeautifulSoup
@@ -227,6 +224,13 @@ def set_courses_teacher(course_info):
     selected_courses.bulk_update(selected_courses, ['teacher'])
 
 
+def create_main_dirs():
+    print("Creating main directories...")
+    courses = Course.objects.all()
+    for course in courses:
+        if not Directory.objects.filter(course=course, parent=None).exists():
+            Directory.objects.create(name=course.name, parent=None, course=course)
+
 
 def apply(chat_id):
     user = User.objects.all().filter(chat_id=chat_id).first()
@@ -254,6 +258,8 @@ def apply(chat_id):
         course_info = crawl_course_info(session, user_info['soup'])
         print("Setting user courses...")
         set_user_courses(user, course_info, courses)
+
+    create_main_dirs()
 
     return 'correct'
 

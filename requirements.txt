@@ -4,3 +4,4 @@ lxml
 beautifulsoup4
 requests
 djangorestframework
+django-after-response

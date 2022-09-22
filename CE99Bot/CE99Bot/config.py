@@ -9,4 +9,4 @@ PASSWORD = 'Mhhasani0987654321'
 BASE_INFO_LINK = "https://lms.iust.ac.ir/course/info.php?id="
 BASE_VIEW_LINK = "https://lms.iust.ac.ir/course/view.php?id="
 
-CURRENT_TERM = '4002'
+CURRENT_TERM = '4011'

@@ -25,4 +25,5 @@ DAYS = {
 
 CALLBACK_DATA = {
     'course': 'course',
+    'directory': 'directory',
 }

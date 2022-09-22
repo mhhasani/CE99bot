@@ -14,9 +14,9 @@ from telegram.ext import (Updater,
                           CallbackQueryHandler,
                           ConversationHandler,)
 
-import requests
 from const import *
 from main_funcs import *
+from main_table import *
 
 
 
@@ -39,6 +39,7 @@ def start(update: Update, context: CallbackContext):
         
     return ConversationHandler.END
 
+
 def get_userpass(update: Update, context: CallbackContext):
     user = get_user_telegram_info_from_update(update, context)
     message = update.message.text
@@ -57,7 +58,7 @@ def get_userpass(update: Update, context: CallbackContext):
         response = send_request('update_status', [user['chat_id']])
         if response['status'] == 'OK':
             update.message.reply_text(RESPONSE_TEXTS['correct_userpass'], parse_mode=ParseMode.HTML)
-            return show_main_table(update, context)
+            show_main_table(update, context)
         else:
             update.message.reply_text(RESPONSE_TEXTS['error'])
 

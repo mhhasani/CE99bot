@@ -13,4 +13,5 @@ urlpatterns = [
     path('create_usercourse_cube/', create_usercourse_cube, name='create_usercourse_cube'),
     path('show_course_table/<int:course_id>/', show_course_table, name='show_course_table'),
     path('update_status/<int:chat_id>/', update_status, name='update_status'),
+    path('show_directory_table/<int:dir_id>/', show_directory_table, name='show_directory_table'),
 ]

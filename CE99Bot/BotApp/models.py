@@ -159,6 +159,7 @@ class File(models.Model):
     name = models.CharField(max_length=500)
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
     directory = models.ForeignKey(Directory, on_delete=models.CASCADE, null=True, blank=True)
+    telegram_id = models.CharField(max_length=500)
 
     def __str__(self):
         return self.name
