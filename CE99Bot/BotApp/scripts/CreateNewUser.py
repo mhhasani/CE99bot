@@ -3,6 +3,7 @@ from BotApp.models import *
 import requests
 from bs4 import BeautifulSoup
 from CE99Bot.config import *
+from .UserCourseCUBE import apply as user_course_cube_apply
 
 def login(username, password):
     url = 'https://lms.iust.ac.ir/login/index.php'
@@ -222,6 +223,7 @@ def set_courses_teacher(course_info):
         course.teacher = teacher
     
     selected_courses.bulk_update(selected_courses, ['teacher'])
+    user_course_cube_apply()
 
 
 def create_main_dirs():
@@ -260,6 +262,7 @@ def apply(chat_id):
         set_user_courses(user, course_info, courses)
 
     create_main_dirs()
+    user_course_cube_apply()
 
     return 'correct'
 

@@ -129,3 +129,23 @@ def update_status(request, chat_id):
         return JsonResponse({"status": "OK"})
     else:
         return JsonResponse({"status": "error"})
+
+
+def create_new_folder(request, current_folder, new_folder_name):
+    pass
+
+
+def create_new_file(request):
+    pass
+
+
+def create_deadline(request):
+    pass
+
+
+def edit_deadline(request):
+    pass
+
+
+def delete_deadline(request):
+    pass
